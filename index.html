@@ -691,6 +691,10 @@
         <label>اسمك (المدير)</label>
         <input id="home-create-name" placeholder="أدخل اسمك..." maxlength="15">
       </div>
+      <div class="input-group">
+        <label>كود الغرفة (اختياري — سيتولد تلقائياً)</label>
+        <input id="home-create-code" placeholder="اكتب كوداً أو اتركه فارغاً" maxlength="8" style="text-transform:uppercase;letter-spacing:0.15em">
+      </div>
       <button class="big-btn red" onclick="createRoom()" style="margin-bottom:0">🚪 إنشاء غرفة</button>
     </div>
   </div>
@@ -939,10 +943,8 @@
       <!-- ADMIN CONTROLS -->
       <div class="card" id="m-admin-controls" style="display:none">
         <h2>🎮 تحكم المدير</h2>
-        <div class="grid-2">
-          <button class="btn btn-gold" onclick="advanceMafiaPhase()">⏭️ المرحلة التالية</button>
-          <button class="btn btn-outline" onclick="newMafiaRound()">🔄 جولة جديدة</button>
-        </div>
+        <div id="m-phase-buttons" style="display:grid;gap:0.5rem"></div>
+        <button class="btn btn-outline" onclick="newMafiaRound()" style="margin-top:0.75rem">🔄 جولة جديدة (إعادة توزيع الأدوار)</button>
         <button class="btn btn-outline" onclick="switchGame()" style="margin-top:0.5rem;border-color:#58a6ff;color:#58a6ff">🔀 تغيير اللعبة</button>
         <div id="m-admin-night-actions" style="display:none;margin-top:1rem">
           <div class="night-panel">
@@ -1080,7 +1082,7 @@
         <div class="word-reveal" id="uc-word-display">...</div>
       </div>
       <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:1rem;margin-top:1rem;font-size:0.85rem;color:#8b949e;text-align:center">
-        <span id="uc-role-hint">اصف الكلمة دون أن تقولها مباشرة</span>
+        <div id="uc-role-hint">اصف الكلمة دون أن تقولها مباشرة</div>
       </div>
       <button class="big-btn blue" onclick="doneReveal()" style="margin-top:1.5rem">✅ حفظت كلمتي</button>
     </div>
@@ -1243,9 +1245,10 @@ window.copyLobbyCode = function() {
 // =====================================================================
 window.createRoom = async function() {
   const name = document.getElementById('home-create-name').value.trim();
+  const customCode = document.getElementById('home-create-code').value.trim().toUpperCase().replace(/\s/g,'');
   if (!name) return showToast('⚠️ أدخل اسمك');
 
-  const code = randCode();
+  const code = customCode || randCode();
   lobbyState.roomCode = code;
   lobbyState.playerName = name;
   lobbyState.isAdmin = true;
@@ -1254,6 +1257,11 @@ window.createRoom = async function() {
   lobbyState.players[lobbyState.playerId] = { id: lobbyState.playerId, name, isAdmin: true };
 
   if (!demoMode) {
+    // Check if code already taken
+    const existing = await get(ref(db, `lobby/${code}`));
+    if (existing.exists() && customCode) {
+      return showToast('⚠️ هذا الكود مستخدم بالفعل، جرب كوداً آخر');
+    }
     await set(ref(db, `lobby/${code}`), {
       adminId: lobbyState.playerId,
       players: lobbyState.players,
@@ -1264,6 +1272,8 @@ window.createRoom = async function() {
   document.getElementById('lobby-room-code').textContent = code;
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('lobby-screen').style.display = 'block';
+  // Save session
+  saveSession();
   renderLobbyCategories();
   updateLobbyPlayers();
 
@@ -1294,18 +1304,78 @@ window.joinRoom = async function() {
 
   const snap = await get(ref(db, `lobby/${code}`));
   if (!snap.exists()) return showToast('❌ الغرفة غير موجودة');
-  const data = snap.val();
-  if (data.started) return showToast('❌ اللعبة بدأت بالفعل');
 
+  // Always allow joining — no started check
   await update(ref(db, `lobby/${code}/players`), {
     [lobbyState.playerId]: { id: lobbyState.playerId, name, isAdmin: false }
   });
 
+  saveSession();
   document.getElementById('lobby-wait-code').textContent = code;
   document.getElementById('home-screen').style.display = 'none';
   document.getElementById('lobby-waiting-screen').style.display = 'block';
   listenLobby();
 };
+
+// =====================================================================
+// SESSION PERSISTENCE (survive page reload)
+// =====================================================================
+function saveSession() {
+  try {
+    sessionStorage.setItem('gfSession', JSON.stringify({
+      roomCode: lobbyState.roomCode,
+      playerName: lobbyState.playerName,
+      playerId: lobbyState.playerId,
+      isAdmin: lobbyState.isAdmin
+    }));
+  } catch(e) {}
+}
+
+async function restoreSession() {
+  try {
+    const raw = sessionStorage.getItem('gfSession');
+    if (!raw) return false;
+    const s = JSON.parse(raw);
+    if (!s.roomCode || !s.playerId) return false;
+
+    // Check if room still exists
+    if (demoMode) return false;
+    const snap = await get(ref(db, `lobby/${s.roomCode}`));
+    if (!snap.exists()) { sessionStorage.removeItem('gfSession'); return false; }
+
+    // Re-register player in lobby
+    lobbyState.roomCode = s.roomCode;
+    lobbyState.playerName = s.playerName;
+    lobbyState.playerId = s.playerId;
+    lobbyState.isAdmin = s.isAdmin;
+
+    await update(ref(db, `lobby/${s.roomCode}/players/${s.playerId}`), {
+      id: s.playerId, name: s.playerName, isAdmin: s.isAdmin
+    });
+
+    const data = snap.val();
+    lobbyState.players = data.players || {};
+
+    document.getElementById('home-screen').style.display = 'none';
+
+    if (data.started && data.game) {
+      // Game already running — rejoin
+      document.getElementById('switch-btn').style.display = 'flex';
+      startGameFromLobby(data.game, data.gameSettings || {});
+    } else if (s.isAdmin) {
+      document.getElementById('lobby-room-code').textContent = s.roomCode;
+      document.getElementById('lobby-screen').style.display = 'block';
+      renderLobbyCategories();
+      updateLobbyPlayers();
+    } else {
+      document.getElementById('lobby-wait-code').textContent = s.roomCode;
+      document.getElementById('lobby-waiting-screen').style.display = 'block';
+      updateLobbyWaitingPlayers();
+    }
+    listenLobby();
+    return true;
+  } catch(e) { return false; }
+}
 
 // =====================================================================
 // LOBBY LISTEN
@@ -1321,6 +1391,7 @@ function listenLobby() {
 
     // If game started, switch to that game
     if (data.started && data.game) {
+      saveSession();
       startGameFromLobby(data.game, data.gameSettings || {});
     }
   });
@@ -1690,7 +1761,7 @@ function renderMafiaPlayers() {
   grid.innerHTML = players.map(p => {
     const eliminated = p.eliminated;
     const roleData = MAFIA_ROLES[p.role] || MAFIA_ROLES.citizen;
-    const showRole = mState.isAdmin || p.id === mState.playerId || eliminated;
+    const showRole = p.id === mState.playerId || eliminated;
     const voteCount = Object.values(mState.votes || {}).filter(v => v === p.id).length;
     const myVote = mState.votes[mState.playerId] === p.id;
 
@@ -1700,7 +1771,7 @@ function renderMafiaPlayers() {
       ${voteCount > 0 ? `<div class="vote-count">🗳️ ${voteCount}</div>` : ''}
       ${isVotePhase && !eliminated && p.id !== mState.playerId ? 
         `<button class="vote-btn ${myVote ? 'voted' : ''}" onclick="voteMafia('${p.id}')">
-          ${myVote ? '✅ صوّتت' : '🗳️ صوّت'}
+          ${myVote ? '↩️ إلغاء' : '🗳️ صوّت'}
         </button>` : ''}
     </div>`;
   }).join('');
@@ -1899,13 +1970,21 @@ function updateMafiaPhaseUI() {
   const nightActions = document.getElementById('m-admin-night-actions');
   const nightSelect = document.getElementById('m-night-select-mafia');
   const myNight = document.getElementById('m-my-night-action');
+  const phaseButtons = document.getElementById('m-phase-buttons');
 
   if (mState.phase === 'day') {
     if (badge) { badge.className = 'phase-badge day'; badge.textContent = '☀️ النهار'; }
+    if (phaseButtons) phaseButtons.innerHTML = `
+      <button class="btn btn-gold" onclick="advanceMafiaPhase('day_to_vote')">🗳️ بدأ التصويت</button>
+      <button class="btn btn-blue" onclick="advanceMafiaPhase('day_to_night')">🌙 بدأ الليل</button>`;
   } else if (mState.phase === 'night') {
     if (badge) { badge.className = 'phase-badge night'; badge.textContent = '🌙 الليل'; }
+    if (phaseButtons) phaseButtons.innerHTML = `
+      <button class="btn btn-gold" onclick="advanceMafiaPhase('night_to_day')">☀️ انتهى الليل — بدأ النهار</button>`;
   } else if (mState.phase === 'vote') {
     if (badge) { badge.className = 'phase-badge vote'; badge.textContent = '🗳️ التصويت'; }
+    if (phaseButtons) phaseButtons.innerHTML = `
+      <button class="btn btn-red" onclick="advanceMafiaPhase('end_vote')">⚖️ نهاية التصويت وإقصاء اللاعب</button>`;
   }
 
   if (adminCtrl) adminCtrl.style.display = mState.isAdmin ? 'block' : 'none';
@@ -1962,74 +2041,83 @@ window.setMafiaTarget = function() {
   if (sel) { mState.mafiaTarget = sel.value; showToast('✅ تم تحديد الهدف'); }
 };
 
-window.advanceMafiaPhase = async function() {
-  const phases = ['day', 'vote', 'night', 'day'];
-  const current = mState.phase;
-  const idx = phases.indexOf(current);
-  const next = phases[(idx + 1) % phases.length];
+window.advanceMafiaPhase = async function(action) {
+  let next, eventText;
+  let updates = { votes: {} };
 
-  let eventText = '';
-  let updates = { phase: next, votes: {} };
-
-  if (current === 'vote') {
-    // Process votes — eliminate most voted
+  if (action === 'day_to_vote') {
+    next = 'vote';
+    eventText = '🗳️ بدأ التصويت! من هو المافيا؟';
+  } else if (action === 'day_to_night') {
+    next = 'night';
+    eventText = '🌙 بدأ الليل — المافيا تتحرك في الظلام...';
+    updates.votes = {};
+  } else if (action === 'night_to_day') {
+    // Process night kill
+    const target = mState.mafiaTarget;
+    const docTarget = mState.doctorTarget;
+    next = 'day';
+    if (target) {
+      if (target !== docTarget) {
+        updates[`players/${target}/eliminated`] = true;
+        const p = mState.players[target];
+        eventText = `💀 ${p?.name || '؟'} قُتل الليلة — ☀️ بدأ النهار`;
+        const remainingAfter = Object.values(mState.players).filter(p => !p.eliminated && p.id !== target);
+        const mafiaLeft = remainingAfter.filter(p => p.role === 'mafia').length;
+        const civLeft = remainingAfter.filter(p => p.role !== 'mafia').length;
+        if (mafiaLeft === 0) setTimeout(() => showMafiaGameover('citizens'), 400);
+        if (mafiaLeft >= civLeft) setTimeout(() => showMafiaGameover('mafia'), 400);
+      } else {
+        eventText = '🛡️ الطبيب أنقذ الضحية! — ☀️ بدأ النهار';
+      }
+      mState.mafiaTarget = ''; mState.doctorTarget = '';
+    } else {
+      eventText = `☀️ بدأ النهار — الجولة ${(mState.round||1)+1}`;
+    }
+    updates.round = (mState.round || 1) + 1;
+  } else if (action === 'end_vote') {
+    // Process votes → eliminate most voted
     const voteCounts = {};
     Object.values(mState.votes || {}).forEach(v => { voteCounts[v] = (voteCounts[v] || 0) + 1; });
     const sorted = Object.entries(voteCounts).sort((a,b) => b[1]-a[1]);
+    next = 'day';
     if (sorted.length > 0) {
       const [topId] = sorted[0];
       const topPlayer = mState.players[topId];
       if (topPlayer) {
         updates[`players/${topId}/eliminated`] = true;
-        eventText = `⚖️ تم إقصاء ${topPlayer.name} (${MAFIA_ROLES[topPlayer.role]?.name || 'مواطن'})`;
-        // Check win
+        eventText = `⚖️ ${topPlayer.name} أُقصي (${MAFIA_ROLES[topPlayer.role]?.name || 'مواطن'}) — ☀️ بدأ النهار`;
         const remainingAfter = Object.values(mState.players).filter(p => !p.eliminated && p.id !== topId);
         const mafiaLeft = remainingAfter.filter(p => p.role === 'mafia').length;
         const civLeft = remainingAfter.filter(p => p.role !== 'mafia').length;
-        if (mafiaLeft === 0) { showMafiaGameover('citizens'); }
-        if (mafiaLeft >= civLeft) { showMafiaGameover('mafia'); }
+        if (mafiaLeft === 0) setTimeout(() => showMafiaGameover('citizens'), 400);
+        if (mafiaLeft >= civLeft) setTimeout(() => showMafiaGameover('mafia'), 400);
       }
     } else {
-      eventText = '🗳️ لا أحد حصل على أصوات';
+      eventText = '🤷 لا أحد صوّت — ☀️ بدأ النهار';
     }
-  } else if (current === 'night') {
-    // Process night kill
-    const target = mState.mafiaTarget;
-    const docTarget = mState.doctorTarget;
-    if (target) {
-      if (target !== docTarget) {
-        updates[`players/${target}/eliminated`] = true;
-        const p = mState.players[target];
-        eventText = `💀 تم قتل ${p?.name || '؟'} الليلة الماضية`;
-        // Check win
-        const remainingAfter = Object.values(mState.players).filter(p => !p.eliminated && p.id !== target);
-        const mafiaLeft = remainingAfter.filter(p => p.role === 'mafia').length;
-        const civLeft = remainingAfter.filter(p => p.role !== 'mafia').length;
-        if (mafiaLeft === 0) { showMafiaGameover('citizens'); }
-        if (mafiaLeft >= civLeft) { showMafiaGameover('mafia'); }
-      } else {
-        eventText = '🛡️ الطبيب أنقذ الضحية الليلة!';
-      }
-      mState.mafiaTarget = '';
-      mState.doctorTarget = '';
-    } else {
-      eventText = `☀️ بدأ النهار - الجولة ${mState.round + 1}`;
-    }
-    updates.round = (mState.round || 1) + 1;
-  } else if (current === 'day') {
-    eventText = '🗳️ وقت التصويت! من تشك فيه؟';
   } else {
-    eventText = `🌙 بدأ الليل - المافيا تتحرك`;
+    return;
   }
 
   const newEvents = [{ text: eventText, time: now(), isNew: true }, ...mState.events].slice(0, 5);
+  updates.phase = next;
   updates.events = newEvents;
 
   if (demoMode) {
     mState.phase = next;
     mState.events = newEvents;
     mState.votes = {};
-    if (updates[`players/${mState.mafiaTarget}/eliminated`]) mState.players[mState.mafiaTarget].eliminated = true;
+    if (action === 'night_to_day' && mState.mafiaTarget && mState.mafiaTarget !== mState.doctorTarget) {
+      if (mState.players[mState.mafiaTarget]) mState.players[mState.mafiaTarget].eliminated = true;
+    }
+    if (action === 'end_vote') {
+      const voteCounts = {};
+      Object.values(mState.votes||{}).forEach(v => { voteCounts[v]=(voteCounts[v]||0)+1; });
+      const sorted = Object.entries(voteCounts).sort((a,b)=>b[1]-a[1]);
+      if (sorted.length > 0 && mState.players[sorted[0][0]]) mState.players[sorted[0][0]].eliminated = true;
+    }
+    mState.mafiaTarget = ''; mState.doctorTarget = '';
     renderMafiaPlayers(); renderMafiaEvents(); updateMafiaPhaseUI();
     return;
   }
@@ -2042,12 +2130,24 @@ window.voteMafia = async function(targetId) {
   const me = mState.players[mState.playerId];
   if (!me || me.eliminated) return;
 
-  mState.votes[mState.playerId] = targetId;
-  addMafiaEvent(`🗳️ ${me.name} صوّت`);
-
-  if (!demoMode) {
-    await update(ref(db, `mafia/${mState.roomCode}/votes`), { [mState.playerId]: targetId });
-    await update(ref(db, `mafia/${mState.roomCode}/events`), Object.fromEntries(mState.events.map((e,i)=>[i,e])));
+  // Toggle vote
+  const currentVote = mState.votes[mState.playerId];
+  if (currentVote === targetId) {
+    delete mState.votes[mState.playerId];
+    addMafiaEvent(`↩️ ${me.name} ألغى صوته`);
+    if (!demoMode) {
+      await update(ref(db, `mafia/${mState.roomCode}`), {
+        [`votes/${mState.playerId}`]: null,
+        events: Object.fromEntries(mState.events.map((e,i)=>[i,e]))
+      });
+    }
+  } else {
+    mState.votes[mState.playerId] = targetId;
+    addMafiaEvent(`🗳️ ${me.name} صوّت`);
+    if (!demoMode) {
+      await update(ref(db, `mafia/${mState.roomCode}/votes`), { [mState.playerId]: targetId });
+      await update(ref(db, `mafia/${mState.roomCode}/events`), Object.fromEntries(mState.events.map((e,i)=>[i,e])));
+    }
   }
   renderMafiaPlayers();
 };
@@ -2177,7 +2277,7 @@ function renderUCPlayers() {
       </div>
       ${isVote && !eliminated && p.id !== ucState.playerId ?
         `<button class="uc-vote-btn ${myVote ? 'voted' : ''}" onclick="voteUC('${p.id}')">
-          ${myVote ? '✅' : '🗳️ صوّت'}
+          ${myVote ? '↩️ إلغاء' : '🗳️ صوّت'}
         </button>` : ''}
     </div>`;
   }).join('');
@@ -2238,11 +2338,11 @@ function listenUCRoom() {
     ucState.events = data.events ? (Array.isArray(data.events) ? data.events : Object.values(data.events)).slice(0,5) : [];
     ucState.votes = data.votes || {};
     ucState.round = data.round || 1;
+    ucState.spyId = data.spyId || null;
 
     if (data.phase === 'waiting') {
       updateUCWaiting();
     } else if (data.phase === 'reveal') {
-      // Each player sees their own word
       const myData = data.wordReveal?.[ucState.playerId];
       if (myData && !ucState.wordRevealed) {
         ucState.myWord = myData.word;
@@ -2338,16 +2438,28 @@ function showUCWordReveal() {
   const nameEl = document.getElementById('uc-reveal-name');
 
   if (nameEl) nameEl.textContent = ucState.playerName;
-  if (wordEl) wordEl.textContent = ucState.myWord;
 
   if (ucState.isSpy) {
+    // Spy sees: first letter + word length hint, NOT the real word
+    const realWord = ucState.myWord; // spy's fake/hint word
+    const firstLetter = realWord.charAt(0);
+    const letterCount = realWord.length;
     if (card) card.className = 'word-card spy';
-    if (wordEl) wordEl.className = 'word-reveal spy-word';
-    if (label) label.textContent = 'أنت المتسلل! كلمتك:';
-    if (hint) hint.textContent = '⚠️ أنت المتسلل! حاول اكتشاف الكلمة الحقيقية من ردود الآخرين دون أن تُكشف';
+    if (wordEl) {
+      wordEl.className = 'word-reveal spy-word';
+      wordEl.textContent = '🕵️ أنت المتسلل!';
+    }
+    if (label) label.textContent = 'تلميح عن الكلمة الحقيقية:';
+    const hintText = `الكلمة تبدأ بحرف "${firstLetter}" وتحتوي على ${letterCount} حرف`;
+    if (hint) hint.innerHTML = `<div style="margin-bottom:0.5rem;color:#f85149;font-size:1rem;font-weight:700">⚠️ أنت المتسلل!</div>
+      <div style="color:#e6edf3;margin-bottom:0.4rem">${hintText}</div>
+      <div style="color:#8b949e;font-size:0.8rem">استمع لأوصاف الآخرين لتخمين الكلمة الحقيقية</div>`;
   } else {
     if (card) card.className = 'word-card';
-    if (wordEl) wordEl.className = 'word-reveal';
+    if (wordEl) {
+      wordEl.className = 'word-reveal';
+      wordEl.textContent = ucState.myWord;
+    }
     if (label) label.textContent = 'الكلمة السرية:';
     if (hint) hint.textContent = '💡 صف الكلمة بجملة واحدة دون ذكرها — ساعد في كشف المتسلل!';
   }
@@ -2384,75 +2496,165 @@ function showUCView(view) {
 }
 
 window.advanceUCPhase = async function() {
-  const phases = ['playing', 'vote', 'playing'];
   const current = ucState.phase;
-
   let next, eventText, updates = {};
 
   if (current === 'playing') {
     next = 'vote';
     eventText = '🗳️ وقت التصويت! من هو المتسلل؟';
+    updates.phase = next;
+    updates.events = [{ text: eventText, time: now(), isNew: true }, ...ucState.events].slice(0,5);
+
+    if (demoMode) {
+      ucState.phase = next;
+      ucState.events = updates.events;
+      renderUCPlayers(); renderUCEvents();
+    } else {
+      await update(ref(db, `undercover/${ucState.roomCode}`), updates);
+    }
+
   } else if (current === 'vote') {
-    // Process votes
+    // Process votes → eliminate most voted → start new round automatically
     const voteCounts = {};
-    Object.values(ucState.votes || {}).forEach(v => { voteCounts[v] = (voteCounts[v] || 0) + 1; });
+    Object.values(ucState.votes || {}).forEach(v => { if(v) voteCounts[v] = (voteCounts[v] || 0) + 1; });
     const sorted = Object.entries(voteCounts).sort((a,b) => b[1]-a[1]);
 
+    let eliminatedId = null;
+    let eliminatedName = '';
+    let spyCaught = false;
+
     if (sorted.length > 0) {
-      const [topId] = sorted[0];
-      const topPlayer = ucState.players[topId];
+      eliminatedId = sorted[0][0];
+      const topPlayer = ucState.players[eliminatedId];
       if (topPlayer) {
-        updates[`players/${topId}/eliminated`] = true;
-        if (topPlayer.isSpy || (ucState.spyId && topId === ucState.spyId)) {
-          eventText = `🎯 تم إقصاء المتسلل ${topPlayer.name}! فاز الفريق!`;
-          next = 'playing';
-          setTimeout(() => showUCGameover(true, topPlayer.name), 500);
+        eliminatedName = topPlayer.name;
+        spyCaught = (ucState.spyId && eliminatedId === ucState.spyId) || topPlayer.isSpy;
+        // Mark eliminated
+        if (!demoMode) {
+          await update(ref(db, `undercover/${ucState.roomCode}/players/${eliminatedId}`), { eliminated: true });
         } else {
-          eventText = `❌ تم إقصاء ${topPlayer.name} — لم يكن المتسلل!`;
-          next = 'playing';
-          // Check if spy wins
-          const alivePlayers = Object.values(ucState.players).filter(p => !p.eliminated && p.id !== topId);
-          if (alivePlayers.length <= 2) {
-            setTimeout(() => showUCGameover(false, ''), 500);
-          }
+          ucState.players[eliminatedId].eliminated = true;
         }
       }
-    } else {
-      eventText = '🗳️ لا أحد حصل على أصوات — تستمر اللعبة';
-      next = 'playing';
     }
-    updates.votes = {};
-  } else {
-    next = 'playing';
-    eventText = `💬 جولة نقاش جديدة`;
-  }
 
-  const newEvents = [{ text: eventText, time: now(), isNew: true }, ...ucState.events].slice(0,5);
-  updates.phase = next;
-  updates.events = newEvents;
+    if (spyCaught) {
+      eventText = `🎯 تم إقصاء المتسلل ${eliminatedName}! فاز الفريق! 🎉`;
+      const evts = [{ text: eventText, time: now(), isNew: true }, ...ucState.events].slice(0,5);
+      if (demoMode) { ucState.events = evts; renderUCEvents(); }
+      else await update(ref(db, `undercover/${ucState.roomCode}/events`), Object.fromEntries(evts.map((e,i)=>[i,e])));
+
+      showUCGameover(true, eliminatedName);
+    } else {
+      // Check if spy wins (≤2 alive non-eliminated)
+      const alivePlayers = Object.values(ucState.players).filter(p => !p.eliminated);
+      if (alivePlayers.length <= 2) {
+        eventText = eliminatedId
+          ? `❌ تم إقصاء ${eliminatedName} — لم يكن المتسلل! فاز المتسلل 🕵️`
+          : '🕵️ لا أحد صوّت — فاز المتسلل!';
+        const evts = [{ text: eventText, time: now(), isNew: true }, ...ucState.events].slice(0,5);
+        if (demoMode) { ucState.events = evts; renderUCEvents(); }
+        else await update(ref(db, `undercover/${ucState.roomCode}/events`), Object.fromEntries(evts.map((e,i)=>[i,e])));
+        showUCGameover(false, '');
+      } else {
+        // Start new round automatically with remaining players
+        eventText = eliminatedId
+          ? `❌ تم إقصاء ${eliminatedName} — لم يكن المتسلل! جولة جديدة...`
+          : '🤷 لا أحد صوّت — جولة جديدة!';
+        await startNewUCRoundAuto(eventText);
+      }
+    }
+  } else {
+    // playing
+    next = 'playing';
+    eventText = '💬 جولة نقاش جديدة';
+    updates.phase = next;
+    updates.events = [{ text: eventText, time: now(), isNew: true }, ...ucState.events].slice(0,5);
+    if (demoMode) {
+      ucState.phase = next; ucState.events = updates.events;
+      renderUCPlayers(); renderUCEvents();
+    } else {
+      await update(ref(db, `undercover/${ucState.roomCode}`), updates);
+    }
+  }
+};
+
+async function startNewUCRoundAuto(eventPrefix) {
+  // New round with surviving players, new spy, new words
+  ucState.wordRevealed = false;
+  const alivePlayers = Object.values(ucState.players).filter(p => !p.eliminated);
+  if (alivePlayers.length < 2) return;
+
+  const [word, spyWord] = pickUCWords();
+  const spyId = alivePlayers[Math.floor(Math.random() * alivePlayers.length)].id;
+  const wordReveal = {};
+  Object.values(ucState.players).forEach(p => {
+    if (!p.eliminated) {
+      wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
+    }
+  });
+
+  const newRound = (ucState.round || 1) + 1;
+  const evts = [
+    { text: `🎮 جولة ${newRound} — متسلل جديد!`, time: now(), isNew: true },
+    { text: eventPrefix, time: now(), isNew: false },
+    ...ucState.events
+  ].slice(0,5);
+
+  const updates = {
+    phase: 'reveal',
+    round: newRound,
+    spyId,
+    word, spyWord,
+    wordReveal,
+    votes: {},
+    events: evts
+  };
 
   if (demoMode) {
-    ucState.phase = next;
-    ucState.events = newEvents;
+    ucState.phase = 'reveal';
+    ucState.round = newRound;
+    ucState.spyId = spyId;
     ucState.votes = {};
-    renderUCPlayers(); renderUCEvents();
+    ucState.events = evts;
+    const myData = wordReveal[ucState.playerId];
+    if (myData) {
+      ucState.myWord = myData.word;
+      ucState.isSpy = myData.isSpy;
+      ucState.wordRevealed = true;
+      showUCWordReveal();
+    }
     return;
   }
-
   await update(ref(db, `undercover/${ucState.roomCode}`), updates);
-};
+}
 
 window.voteUC = async function(targetId) {
   if (ucState.phase !== 'vote') return;
   const me = ucState.players[ucState.playerId];
   if (!me || me.eliminated) return;
 
-  ucState.votes[ucState.playerId] = targetId;
-  addUCEvent(`🗳️ ${me.name} صوّت`);
-
-  if (!demoMode) {
-    await update(ref(db, `undercover/${ucState.roomCode}/votes`), { [ucState.playerId]: targetId });
-    await update(ref(db, `undercover/${ucState.roomCode}/events`), Object.fromEntries(ucState.events.map((e,i)=>[i,e])));
+  // Toggle vote: click same player again = cancel vote
+  const currentVote = ucState.votes[ucState.playerId];
+  if (currentVote === targetId) {
+    // Cancel vote
+    delete ucState.votes[ucState.playerId];
+    addUCEvent(`↩️ ${me.name} ألغى صوته`);
+    if (!demoMode) {
+      const votesObj = {};
+      Object.entries(ucState.votes).forEach(([k,v]) => { votesObj[k] = v; });
+      await update(ref(db, `undercover/${ucState.roomCode}`), {
+        [`votes/${ucState.playerId}`]: null,
+        events: Object.fromEntries(ucState.events.map((e,i)=>[i,e]))
+      });
+    }
+  } else {
+    ucState.votes[ucState.playerId] = targetId;
+    addUCEvent(`🗳️ ${me.name} صوّت`);
+    if (!demoMode) {
+      await update(ref(db, `undercover/${ucState.roomCode}/votes`), { [ucState.playerId]: targetId });
+      await update(ref(db, `undercover/${ucState.roomCode}/events`), Object.fromEntries(ucState.events.map((e,i)=>[i,e])));
+    }
   }
   renderUCPlayers();
 };
@@ -2486,6 +2688,8 @@ window.newUCRound = async function() {
 
 // Init
 renderUCCategories();
+// Try to restore session after page reload
+restoreSession();
 </script>
 </body>
 </html>
