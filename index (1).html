@@ -1,0 +1,2491 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎭 ألعاب الأصدقاء</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+
+  :root {
+    --mafia-bg: #0a0a0f;
+    --mafia-card: #13131a;
+    --mafia-red: #e63946;
+    --mafia-gold: #ffd60a;
+    --mafia-text: #f1f1f1;
+    --mafia-muted: #888;
+    --mafia-border: #2a2a3a;
+    --undercover-bg: #0d1117;
+    --undercover-card: #161b22;
+    --undercover-blue: #58a6ff;
+    --undercover-green: #3fb950;
+    --undercover-text: #e6edf3;
+    --undercover-muted: #8b949e;
+    --undercover-border: #30363d;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Cairo', sans-serif;
+    background: var(--mafia-bg);
+    color: var(--mafia-text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    transition: background 0.5s, color 0.5s;
+  }
+
+  body.undercover-theme {
+    background: var(--undercover-bg);
+    color: var(--undercover-text);
+  }
+
+  /* ===== HOME SCREEN ===== */
+  #home-screen {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at center, #1a1a2e 0%, #0a0a0f 70%);
+    padding: 2rem;
+  }
+
+  .home-title {
+    font-size: 2.5rem;
+    font-weight: 900;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #ffd60a, #e63946);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .home-subtitle {
+    color: #888;
+    text-align: center;
+    margin-bottom: 3rem;
+    font-size: 1rem;
+  }
+
+  .game-cards {
+    display: flex;
+    gap: 2rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .game-card {
+    width: 220px;
+    padding: 2rem 1.5rem;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: transform 0.3s, box-shadow 0.3s;
+    text-align: center;
+    border: 2px solid transparent;
+  }
+
+  .game-card:hover { transform: translateY(-8px); }
+
+  .game-card.mafia-card {
+    background: linear-gradient(145deg, #1a0a0a, #130010);
+    border-color: #e63946;
+    box-shadow: 0 0 30px rgba(230,57,70,0.2);
+  }
+
+  .game-card.mafia-card:hover {
+    box-shadow: 0 10px 50px rgba(230,57,70,0.4);
+  }
+
+  .game-card.undercover-card {
+    background: linear-gradient(145deg, #0a0a1a, #001020);
+    border-color: #58a6ff;
+    box-shadow: 0 0 30px rgba(88,166,255,0.2);
+  }
+
+  .game-card.undercover-card:hover {
+    box-shadow: 0 10px 50px rgba(88,166,255,0.4);
+  }
+
+  .card-emoji { font-size: 3.5rem; margin-bottom: 1rem; }
+  .card-title { font-size: 1.4rem; font-weight: 900; margin-bottom: 0.5rem; }
+  .card-desc { font-size: 0.85rem; color: #aaa; line-height: 1.6; }
+
+  /* ===== SWITCH GAME BUTTON ===== */
+  .switch-btn {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 1000;
+    background: rgba(0,0,0,0.7);
+    border: 1px solid #333;
+    color: #fff;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    cursor: pointer;
+    font-family: 'Cairo', sans-serif;
+    font-size: 0.85rem;
+    transition: all 0.3s;
+    backdrop-filter: blur(10px);
+    display: none;
+  }
+
+  .switch-btn:hover { border-color: #ffd60a; color: #ffd60a; }
+
+  /* ===== SCREENS ===== */
+  .screen { display: none; min-height: 100vh; padding: 1rem; }
+  .screen.active { display: block; }
+
+  /* ===== MAFIA STYLES ===== */
+  .mafia-header {
+    background: linear-gradient(135deg, #1a0508, #0d0010);
+    border-bottom: 1px solid #e63946;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .mafia-logo { font-size: 1.3rem; font-weight: 900; color: #e63946; }
+
+  .card {
+    background: var(--mafia-card);
+    border: 1px solid var(--mafia-border);
+    border-radius: 16px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .card h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1rem; }
+
+  .input-group { margin-bottom: 1rem; }
+  .input-group label { display: block; font-size: 0.85rem; color: #aaa; margin-bottom: 0.4rem; }
+
+  input, select, textarea {
+    width: 100%;
+    background: #0d0d14;
+    border: 1px solid #2a2a3a;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    color: #f1f1f1;
+    font-family: 'Cairo', sans-serif;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, select:focus { border-color: #e63946; }
+
+  .btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Cairo', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+
+  .btn-red { background: #e63946; color: #fff; }
+  .btn-red:hover { background: #c1121f; transform: translateY(-1px); }
+  .btn-gold { background: #ffd60a; color: #000; }
+  .btn-gold:hover { background: #f2c10a; transform: translateY(-1px); }
+  .btn-outline { background: transparent; border: 1px solid #2a2a3a; color: #aaa; }
+  .btn-outline:hover { border-color: #e63946; color: #e63946; }
+  .btn-green { background: #2d6a4f; color: #fff; }
+  .btn-green:hover { background: #1b4332; }
+  .btn-blue { background: #1d3557; color: #fff; }
+  .btn-blue:hover { background: #0d2035; }
+  .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.8rem; width: auto; margin-top: 0; }
+  .btn-danger-sm { background: #7d1f1f; color: #ff6b6b; font-size: 0.75rem; padding: 0.3rem 0.6rem; border-radius: 6px; border: none; cursor: pointer; font-family: 'Cairo', sans-serif; }
+
+  /* ===== EVENTS PANEL ===== */
+  .events-panel {
+    background: var(--mafia-card);
+    border: 1px solid var(--mafia-border);
+    border-radius: 16px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .events-title {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #ffd60a;
+    margin-bottom: 0.75rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .events-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+    min-height: 160px;
+  }
+
+  .event-item {
+    background: #0d0d18;
+    border: 1px solid #1e1e2e;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.82rem;
+    color: #ccc;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    animation: eventIn 0.3s ease;
+  }
+
+  @keyframes eventIn {
+    from { opacity: 0; transform: translateX(10px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .event-item.new { border-color: #e63946; color: #fff; }
+  .event-time { color: #555; font-size: 0.75rem; min-width: 40px; }
+
+  /* ===== PLAYERS LIST ===== */
+  .players-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 0.5rem;
+  }
+
+  .player-item {
+    background: #0d0d18;
+    border: 1px solid #1e1e2e;
+    border-radius: 10px;
+    padding: 0.6rem 0.8rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    position: relative;
+    transition: all 0.2s;
+  }
+
+  .player-item.eliminated {
+    opacity: 0.4;
+    background: #0a0a0a;
+  }
+
+  .player-item.voted { border-color: #e63946; }
+
+  .player-name { font-size: 0.9rem; font-weight: 700; text-align: center; }
+  .player-role { font-size: 0.7rem; color: #aaa; }
+  .player-role.mafia { color: #e63946; }
+  .player-role.detective { color: #ffd60a; }
+  .player-role.doctor { color: #52b788; }
+
+  .vote-btn {
+    background: #1a1a2a;
+    border: 1px solid #333;
+    color: #aaa;
+    font-size: 0.72rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: 'Cairo', sans-serif;
+    transition: all 0.2s;
+    margin-top: 0.2rem;
+  }
+
+  .vote-btn:hover { border-color: #e63946; color: #e63946; }
+  .vote-btn.voted { background: #e63946; color: #fff; border-color: #e63946; }
+  .vote-count { font-size: 0.7rem; color: #e63946; font-weight: 700; }
+
+  /* ===== ROLE REVEAL ===== */
+  .role-reveal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 500;
+    display: none;
+  }
+
+  .role-reveal-card {
+    background: #13131a;
+    border-radius: 20px;
+    padding: 3rem 2rem;
+    text-align: center;
+    max-width: 320px;
+    border: 2px solid #e63946;
+    box-shadow: 0 0 60px rgba(230,57,70,0.3);
+  }
+
+  .role-big { font-size: 4rem; }
+  .role-name { font-size: 1.8rem; font-weight: 900; margin: 1rem 0 0.5rem; }
+  .role-desc { color: #aaa; font-size: 0.9rem; line-height: 1.6; }
+
+  /* ===== PHASE BADGE ===== */
+  .phase-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  .phase-badge.day { background: #2d2000; color: #ffd60a; border: 1px solid #ffd60a33; }
+  .phase-badge.night { background: #0d0d20; color: #7c9aed; border: 1px solid #7c9aed33; }
+  .phase-badge.vote { background: #2d0d0d; color: #e63946; border: 1px solid #e6394633; }
+
+  /* ===== NIGHT ACTIONS ===== */
+  .night-panel {
+    background: #0d0d18;
+    border: 1px solid #7c9aed33;
+    border-radius: 12px;
+    padding: 1rem;
+    margin-top: 0.5rem;
+  }
+
+  /* ===== UNDERCOVER STYLES ===== */
+  .undercover-theme .card {
+    background: var(--undercover-card);
+    border-color: var(--undercover-border);
+  }
+
+  .undercover-theme input,
+  .undercover-theme select {
+    background: #0d1117;
+    border-color: #30363d;
+    color: var(--undercover-text);
+  }
+
+  .undercover-theme input:focus,
+  .undercover-theme select:focus { border-color: #58a6ff; }
+
+  .undercover-header {
+    background: linear-gradient(135deg, #0d1117, #10192a);
+    border-bottom: 1px solid #58a6ff;
+    padding: 1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .undercover-logo { font-size: 1.3rem; font-weight: 900; color: #58a6ff; }
+
+  .undercover-theme .btn-red { background: #58a6ff; }
+  .undercover-theme .btn-red:hover { background: #388bfd; }
+
+  .word-card {
+    background: linear-gradient(135deg, #0d1117, #0f1f35);
+    border: 2px solid #58a6ff;
+    border-radius: 20px;
+    padding: 2rem;
+    text-align: center;
+    margin: 1rem 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .word-card::before {
+    content: '';
+    position: absolute;
+    inset: -50%;
+    background: radial-gradient(circle, rgba(88,166,255,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .word-card.spy { border-color: #f85149; }
+  .word-card.spy::before { background: radial-gradient(circle, rgba(248,81,73,0.05) 0%, transparent 60%); }
+
+  .word-reveal { font-size: 2.5rem; font-weight: 900; color: #58a6ff; }
+  .word-reveal.spy-word { color: #f85149; }
+  .word-label { font-size: 0.85rem; color: #8b949e; margin-bottom: 0.5rem; }
+
+  .undercover-player-item {
+    background: var(--undercover-card);
+    border: 1px solid var(--undercover-border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s;
+  }
+
+  .undercover-player-item.eliminated { opacity: 0.3; }
+  .undercover-player-item.voted { border-color: #f85149; }
+
+  .uc-vote-btn {
+    background: #1c2128;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    font-size: 0.8rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Cairo', sans-serif;
+    transition: all 0.2s;
+  }
+
+  .uc-vote-btn:hover { border-color: #f85149; color: #f85149; }
+  .uc-vote-btn.voted { background: #f85149; color: #fff; border-color: #f85149; }
+
+  .uc-events-panel {
+    background: var(--undercover-card);
+    border: 1px solid var(--undercover-border);
+    border-radius: 16px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .uc-events-title { font-size: 0.9rem; font-weight: 700; color: #58a6ff; margin-bottom: 0.75rem; }
+
+  .uc-event-item {
+    background: #0d1117;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.82rem;
+    color: #8b949e;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+    animation: eventIn 0.3s ease;
+  }
+
+  .uc-event-item.new { border-color: #58a6ff; color: var(--undercover-text); }
+
+  /* ===== ROOM JOIN ===== */
+  .room-form { max-width: 400px; margin: 3rem auto; }
+
+  .big-btn {
+    padding: 1rem 2rem;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Cairo', sans-serif;
+    font-weight: 900;
+    font-size: 1.1rem;
+    transition: all 0.3s;
+    width: 100%;
+    margin-bottom: 0.75rem;
+  }
+
+  .big-btn.red { background: linear-gradient(135deg, #e63946, #9d0208); color: #fff; }
+  .big-btn.red:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(230,57,70,0.4); }
+  .big-btn.blue { background: linear-gradient(135deg, #58a6ff, #1158cc); color: #fff; }
+  .big-btn.blue:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(88,166,255,0.4); }
+  .big-btn.outline-red { background: transparent; border: 2px solid #e63946; color: #e63946; }
+  .big-btn.outline-blue { background: transparent; border: 2px solid #58a6ff; color: #58a6ff; }
+
+  .room-code {
+    font-size: 2.5rem;
+    font-weight: 900;
+    letter-spacing: 0.3em;
+    color: #ffd60a;
+    text-align: center;
+    font-family: monospace;
+    background: #0d0d14;
+    padding: 1rem;
+    border-radius: 12px;
+    border: 1px solid #ffd60a33;
+    margin: 1rem 0;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #52b788;
+    display: inline-block;
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .tag {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .tag-red { background: #3d0010; color: #e63946; }
+  .tag-gold { background: #2d2000; color: #ffd60a; }
+  .tag-green { background: #1a3d2d; color: #52b788; }
+  .tag-blue { background: #0d2040; color: #58a6ff; }
+  .tag-purple { background: #2d0d3d; color: #b388ff; }
+
+  /* Loading */
+  .loading {
+    text-align: center;
+    padding: 3rem;
+    color: #555;
+  }
+
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid #1a1a2a;
+    border-top-color: #e63946;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1a1a2a;
+    border: 1px solid #333;
+    color: #fff;
+    padding: 0.75rem 1.5rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+
+  .toast.show { opacity: 1; }
+
+  /* Game over overlay */
+  .gameover-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.97);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 800;
+    display: none;
+  }
+
+  .gameover-card {
+    background: #13131a;
+    border-radius: 24px;
+    padding: 3rem 2rem;
+    text-align: center;
+    max-width: 360px;
+    border: 2px solid #ffd60a;
+    box-shadow: 0 0 60px rgba(255,214,10,0.2);
+  }
+
+  .gameover-emoji { font-size: 5rem; }
+  .gameover-title { font-size: 2rem; font-weight: 900; margin: 1rem 0 0.5rem; color: #ffd60a; }
+  .gameover-desc { color: #aaa; margin-bottom: 2rem; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; border-bottom: 1px solid #1e1e2e; padding-bottom: 0.5rem; }
+  .tab { padding: 0.4rem 0.8rem; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600; color: #666; transition: all 0.2s; background: none; border: none; font-family: 'Cairo', sans-serif; }
+  .tab.active { background: #1e1e2e; color: #fff; }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Waiting room */
+  .waiting-players { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+  .waiting-player-chip {
+    background: #13131a;
+    border: 1px solid #2a2a3a;
+    border-radius: 20px;
+    padding: 0.4rem 0.9rem;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+
+  /* Admin settings */
+  .settings-row { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid #1e1e2e; }
+  .settings-label { font-size: 0.9rem; }
+  .settings-sub { font-size: 0.75rem; color: #666; }
+
+  .toggle {
+    width: 44px; height: 24px;
+    background: #1e1e2e;
+    border-radius: 12px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .toggle.on { background: #e63946; }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    background: #fff;
+    border-radius: 50%;
+    top: 3px; right: 3px;
+    transition: right 0.2s;
+  }
+
+  .toggle.on::after { right: auto; left: 3px; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+  select option { background: #0d0d14; }
+
+  /* ===== CATEGORIES TAGS ===== */
+  .cat-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    border: 1px solid #2a2a3a;
+    background: #13131a;
+    transition: all 0.2s;
+    margin: 0.2rem;
+  }
+
+  .cat-tag.selected { background: #2d0010; border-color: #e63946; color: #e63946; }
+
+  /* ===== MOBILE ===== */
+  @media (max-width: 480px) {
+    .game-cards { gap: 1rem; }
+    .game-card { width: 160px; padding: 1.5rem 1rem; }
+    .card-emoji { font-size: 2.5rem; }
+    .players-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- HOME SCREEN -->
+<div id="home-screen">
+  <div class="home-title">🎮 ألعاب الأصدقاء</div>
+  <div class="home-subtitle">أنشئ غرفة أو انضم لغرفة موجودة</div>
+
+  <!-- Create Room -->
+  <div style="width:100%;max-width:380px;margin-bottom:1.5rem">
+    <div class="card" style="background:#13131a;border-color:#2a2a3a">
+      <h2 style="font-size:1rem;margin-bottom:1rem;color:#ffd60a">🆕 إنشاء غرفة جديدة</h2>
+      <div class="input-group">
+        <label>اسمك (المدير)</label>
+        <input id="home-create-name" placeholder="أدخل اسمك..." maxlength="15">
+      </div>
+      <button class="big-btn red" onclick="createRoom()" style="margin-bottom:0">🚪 إنشاء غرفة</button>
+    </div>
+  </div>
+
+  <div style="color:#444;font-size:0.85rem;margin-bottom:1.5rem">— أو —</div>
+
+  <!-- Join Room -->
+  <div style="width:100%;max-width:380px">
+    <div class="card" style="background:#13131a;border-color:#2a2a3a">
+      <h2 style="font-size:1rem;margin-bottom:1rem;color:#58a6ff">🔗 الانضمام لغرفة</h2>
+      <div class="input-group">
+        <label>اسمك</label>
+        <input id="home-join-name" placeholder="أدخل اسمك..." maxlength="15">
+      </div>
+      <div class="input-group">
+        <label>كود الغرفة</label>
+        <input id="home-join-code" placeholder="XXXX" maxlength="6" style="text-transform:uppercase;letter-spacing:0.2em">
+      </div>
+      <button class="big-btn blue" onclick="joinRoom()" style="margin-bottom:0">🚀 انضم</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOBBY SCREEN (after creating room, before game starts) -->
+<div id="lobby-screen" style="display:none;min-height:100vh;padding:1rem">
+  <div class="mafia-header" style="background:linear-gradient(135deg,#1a1a2e,#0a0a0f);border-bottom:1px solid #2a2a3a">
+    <div style="font-size:1.3rem;font-weight:900;color:#ffd60a">🎮 الغرفة</div>
+    <div style="display:flex;align-items:center;gap:0.5rem"><span class="status-dot"></span><span style="font-size:0.8rem;color:#aaa">انتظار اللاعبين</span></div>
+  </div>
+  <div style="max-width:500px;margin:0 auto;padding-top:0.5rem">
+
+    <!-- Room Code -->
+    <div class="card" style="text-align:center">
+      <div style="font-size:0.85rem;color:#aaa;margin-bottom:0.3rem">كود الغرفة — شاركه مع أصدقائك</div>
+      <div class="room-code" id="lobby-room-code">----</div>
+      <button class="btn btn-outline btn-sm" onclick="copyLobbyCode()" style="margin-top:0.75rem;width:auto;padding:0.4rem 1rem">📋 نسخ الكود</button>
+    </div>
+
+    <!-- Players -->
+    <div class="card">
+      <h2>👥 اللاعبون (<span id="lobby-player-count">0</span>)</h2>
+      <div class="waiting-players" id="lobby-players-list" style="margin-top:0.5rem"></div>
+    </div>
+
+    <!-- Game Selection (Admin only) -->
+    <div class="card" id="lobby-game-select">
+      <h2 style="margin-bottom:1rem">🎯 اختر اللعبة</h2>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap">
+        <div class="game-card mafia-card" onclick="selectLobbyGame('mafia')" id="lobby-mafia-card" style="flex:1;min-width:120px;padding:1rem">
+          <div class="card-emoji" style="font-size:2rem">🔫</div>
+          <div class="card-title" style="font-size:1rem">المافيا</div>
+          <div class="card-desc" style="font-size:0.75rem">تحتاج 4+ لاعبين</div>
+        </div>
+        <div class="game-card undercover-card" onclick="selectLobbyGame('undercover')" id="lobby-uc-card" style="flex:1;min-width:120px;padding:1rem">
+          <div class="card-emoji" style="font-size:2rem">🕵️</div>
+          <div class="card-title" style="font-size:1rem">المتسلل</div>
+          <div class="card-desc" style="font-size:0.75rem">تحتاج 3+ لاعبين</div>
+        </div>
+      </div>
+
+      <!-- Mafia settings (when selected) -->
+      <div id="lobby-mafia-settings" style="display:none;margin-top:1rem">
+        <div class="settings-row">
+          <div><div class="settings-label">عدد المافيا</div></div>
+          <select id="lobby-mafia-count" style="width:80px">
+            <option value="auto">تلقائي</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-label">المحقق</div></div>
+          <div class="toggle" id="lobby-toggle-detective" onclick="toggleSetting(this)"></div>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-label">الطبيب</div></div>
+          <div class="toggle" id="lobby-toggle-doctor" onclick="toggleSetting(this)"></div>
+        </div>
+      </div>
+
+      <!-- Undercover settings (when selected) -->
+      <div id="lobby-uc-settings" style="display:none;margin-top:1rem">
+        <div style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem">المجالات:</div>
+        <div id="lobby-uc-categories"></div>
+        <div style="margin-top:0.75rem">
+          <label style="font-size:0.82rem;color:#8b949e;display:block;margin-bottom:0.4rem">أو أدخل كلمتين يدويًا:</label>
+          <div class="grid-2">
+            <input id="lobby-custom-word1" placeholder="الكلمة العامة" style="background:#0d0d14;border-color:#2a2a3a;color:#f1f1f1">
+            <input id="lobby-custom-word2" placeholder="كلمة المتسلل" style="background:#0d0d14;border-color:#2a2a3a;color:#f1f1f1">
+          </div>
+        </div>
+      </div>
+
+      <button class="big-btn red" id="lobby-start-btn" onclick="startLobbyGame()" style="margin-top:1.25rem;display:none" disabled>▶️ ابدأ اللعبة</button>
+    </div>
+
+    <!-- Rename (admin) -->
+    <div class="card">
+      <h2 style="font-size:0.95rem;margin-bottom:0.75rem">✏️ تغيير اسمك</h2>
+      <div style="display:flex;gap:0.5rem">
+        <input id="lobby-rename-admin-input" placeholder="الاسم الجديد..." maxlength="15" style="flex:1">
+        <button class="btn btn-gold btn-sm" onclick="renameLobbyPlayer('admin')" style="width:auto;margin-top:0;padding:0.6rem 1rem">تغيير</button>
+      </div>
+    </div>
+
+    <button class="btn btn-outline" onclick="leaveLobby()" style="margin-top:0.5rem">← الخروج</button>
+  </div>
+</div>
+
+<!-- LOBBY WAITING (non-admin) -->
+<div id="lobby-waiting-screen" style="display:none;min-height:100vh;padding:1rem">
+  <div class="mafia-header" style="background:linear-gradient(135deg,#1a1a2e,#0a0a0f);border-bottom:1px solid #2a2a3a">
+    <div style="font-size:1.3rem;font-weight:900;color:#ffd60a">🎮 الغرفة</div>
+  </div>
+  <div style="max-width:500px;margin:0 auto;padding-top:0.5rem">
+    <div class="card" style="text-align:center;padding:2rem 1rem">
+      <div style="font-size:3rem;margin-bottom:1rem">⏳</div>
+      <div style="font-size:1.1rem;font-weight:700;margin-bottom:0.3rem">في انتظار المدير</div>
+      <div style="font-size:0.85rem;color:#aaa;margin-bottom:1.5rem">سيختار المدير اللعبة ويبدأها قريبًا...</div>
+      <div style="font-size:0.85rem;color:#aaa;margin-bottom:0.5rem">كود الغرفة:</div>
+      <div class="room-code" id="lobby-wait-code" style="font-size:1.8rem;margin:0 auto;max-width:200px">----</div>
+      <div style="margin-top:1.5rem">
+        <div style="font-size:0.85rem;color:#aaa;margin-bottom:0.5rem">اللاعبون:</div>
+        <div class="waiting-players" id="lobby-wait-players" style="justify-content:center"></div>
+      </div>
+    </div>
+
+    <!-- Rename -->
+    <div class="card">
+      <h2 style="font-size:0.95rem;margin-bottom:0.75rem">✏️ تغيير اسمك</h2>
+      <div style="display:flex;gap:0.5rem">
+        <input id="lobby-rename-input" placeholder="الاسم الجديد..." maxlength="15" style="flex:1">
+        <button class="btn btn-gold btn-sm" onclick="renameLobbyPlayer()" style="width:auto;margin-top:0;padding:0.6rem 1rem">تغيير</button>
+      </div>
+    </div>
+
+    <button class="btn btn-outline" onclick="leaveLobby()" style="margin-top:0.5rem">← الخروج</button>
+  </div>
+</div>
+
+<!-- SWITCH BUTTON -->
+<button class="switch-btn" id="switch-btn" onclick="returnToLobby()">🏠 الرئيسية</button>
+
+<!-- ==================== MAFIA GAME ==================== -->
+<div id="mafia-screen" class="screen">
+
+  <!-- JOIN ROOM -->
+  <div id="mafia-join" class="room-form">
+    <div style="text-align:center;margin-bottom:2rem">
+      <div style="font-size:3rem">🔫</div>
+      <div style="font-size:1.8rem;font-weight:900;color:#e63946">المافيا</div>
+    </div>
+    <div class="card">
+      <div class="input-group">
+        <label>اسمك</label>
+        <input id="m-player-name" placeholder="أدخل اسمك..." maxlength="15">
+      </div>
+      <div class="input-group">
+        <label>كودك في الغرفة</label>
+        <input id="m-room-code-input" placeholder="XXXX — اتركه فارغ لإنشاء غرفة جديدة" maxlength="6" style="text-transform:uppercase;letter-spacing:0.2em">
+      </div>
+      <button class="big-btn red" onclick="joinMafiaRoom()">🚪 دخول</button>
+    </div>
+  </div>
+
+  <!-- WAITING ROOM (Admin) -->
+  <div id="mafia-waiting" style="display:none">
+    <div class="mafia-header">
+      <div class="mafia-logo">🔫 المافيا</div>
+      <div style="display:flex;align-items:center;gap:0.5rem"><span class="status-dot"></span><span style="font-size:0.8rem;color:#aaa">انتظار اللاعبين</span></div>
+    </div>
+    <div style="padding:1rem">
+      <div class="card" style="text-align:center">
+        <div style="font-size:0.85rem;color:#aaa;margin-bottom:0.3rem">كود الغرفة</div>
+        <div class="room-code" id="m-room-display">----</div>
+        <div style="font-size:0.8rem;color:#555">شارك هذا الكود مع أصدقائك</div>
+        <button class="btn btn-outline btn-sm" onclick="copyRoomCode('mafia')" style="margin-top:0.75rem;width:auto;padding:0.4rem 1rem">📋 نسخ الكود</button>
+      </div>
+      <div class="card">
+        <h2>⚙️ إعدادات اللعبة</h2>
+        <div class="settings-row">
+          <div><div class="settings-label">عدد المافيا</div><div class="settings-sub">2 عند 8+ لاعبين تلقائيًا</div></div>
+          <select id="m-mafia-count" style="width:80px">
+            <option value="auto">تلقائي</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-label">المحقق</div><div class="settings-sub">يعرف هوية لاعب كل ليلة</div></div>
+          <div class="toggle" id="m-toggle-detective" onclick="toggleSetting(this)"></div>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-label">الطبيب</div><div class="settings-sub">يحمي لاعبًا كل ليلة</div></div>
+          <div class="toggle" id="m-toggle-doctor" onclick="toggleSetting(this)"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>👥 اللاعبين المنضمين (<span id="m-player-count">0</span>)</h2>
+        <div class="waiting-players" id="m-waiting-players"></div>
+      </div>
+      <button class="big-btn red" onclick="startMafiaGame()" id="m-start-btn" disabled>▶️ ابدأ اللعبة</button>
+    </div>
+  </div>
+
+  <!-- WAITING ROOM (Player) -->
+  <div id="mafia-waiting-player" style="display:none">
+    <div class="mafia-header">
+      <div class="mafia-logo">🔫 المافيا</div>
+    </div>
+    <div style="padding:1rem">
+      <div class="card" style="text-align:center;padding:3rem 1rem">
+        <div style="font-size:3rem;margin-bottom:1rem">⏳</div>
+        <div style="font-size:1.1rem;font-weight:700;margin-bottom:0.5rem">في انتظار المدير</div>
+        <div style="font-size:0.85rem;color:#aaa">سيبدأ المدير اللعبة قريبًا...</div>
+        <div style="margin-top:1.5rem">
+          <div class="settings-label" style="margin-bottom:0.5rem">اللاعبون في الغرفة:</div>
+          <div class="waiting-players" id="m-waiting-players-view" style="justify-content:center"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN GAME -->
+  <div id="mafia-game" style="display:none">
+    <div class="mafia-header">
+      <div class="mafia-logo">🔫 المافيا</div>
+      <div id="m-phase-badge" class="phase-badge day">☀️ النهار</div>
+    </div>
+    <div style="padding:1rem">
+
+      <!-- EVENTS (prominent) -->
+      <div class="events-panel">
+        <div class="events-title">📋 الأحداث الأخيرة</div>
+        <div class="events-grid" id="m-events-grid">
+          <div class="event-item" style="color:#555;justify-content:center">لا أحداث بعد...</div>
+        </div>
+      </div>
+
+      <!-- PLAYERS + VOTE -->
+      <div class="card">
+        <h2 id="m-players-title">👥 اللاعبون</h2>
+        <div class="players-grid" id="m-players-grid"></div>
+      </div>
+
+      <!-- ADMIN CONTROLS -->
+      <div class="card" id="m-admin-controls" style="display:none">
+        <h2>🎮 تحكم المدير</h2>
+        <div class="grid-2">
+          <button class="btn btn-gold" onclick="advanceMafiaPhase()">⏭️ المرحلة التالية</button>
+          <button class="btn btn-outline" onclick="newMafiaRound()">🔄 جولة جديدة</button>
+        </div>
+        <button class="btn btn-outline" onclick="switchGame()" style="margin-top:0.5rem;border-color:#58a6ff;color:#58a6ff">🔀 تغيير اللعبة</button>
+        <div id="m-admin-night-actions" style="display:none;margin-top:1rem">
+          <div class="night-panel">
+            <div style="font-size:0.85rem;color:#7c9aed;margin-bottom:0.75rem">🌙 أعمال الليل</div>
+            <div id="m-night-select-mafia" style="display:none">
+              <div style="font-size:0.8rem;color:#e63946;margin-bottom:0.5rem">👊 المافيا تختار ضحية:</div>
+              <select id="m-mafia-target" style="margin-bottom:0.5rem"></select>
+              <button class="btn btn-red btn-sm" onclick="setMafiaTarget()">تأكيد</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MY NIGHT ACTION -->
+      <div class="card" id="m-my-night-action" style="display:none">
+        <div id="m-night-action-content"></div>
+      </div>
+
+      <!-- BACK TO HOME -->
+      <button class="btn btn-outline" onclick="showHome()" style="margin-top:0.5rem">🏠 العودة للرئيسية</button>
+
+      <!-- RENAME -->
+      <div class="card" style="margin-top:0.5rem">
+        <h2 style="font-size:0.9rem;margin-bottom:0.6rem">✏️ تغيير اسمك</h2>
+        <div style="display:flex;gap:0.5rem">
+          <input id="mafia-rename-input" placeholder="الاسم الجديد..." maxlength="15" style="flex:1">
+          <button class="btn btn-gold btn-sm" onclick="renameInGame('mafia')" style="width:auto;margin-top:0;padding:0.6rem 1rem">تغيير</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ROLE REVEAL OVERLAY -->
+<div class="role-reveal-overlay" id="role-reveal-overlay">
+  <div class="role-reveal-card" id="role-reveal-card">
+    <div class="role-big" id="reveal-emoji">🎭</div>
+    <div class="role-name" id="reveal-role">مواطن</div>
+    <div class="role-desc" id="reveal-desc">كن ذكيًا، ساهم في كشف المافيا</div>
+    <button class="btn btn-red" onclick="closeRoleReveal()" style="margin-top:1.5rem">فهمت 👍</button>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div class="gameover-overlay" id="mafia-gameover">
+  <div class="gameover-card">
+    <div class="gameover-emoji" id="m-go-emoji">🏆</div>
+    <div class="gameover-title" id="m-go-title">انتهت اللعبة</div>
+    <div class="gameover-desc" id="m-go-desc"></div>
+    <button class="big-btn red" onclick="closeMafiaGameover()">لعبة جديدة</button>
+  </div>
+</div>
+
+<!-- ==================== UNDERCOVER GAME ==================== -->
+<div id="undercover-screen" class="screen">
+
+  <!-- JOIN -->
+  <div id="uc-join" class="room-form" style="max-width:400px;margin:3rem auto;padding:0 1rem">
+    <div style="text-align:center;margin-bottom:2rem">
+      <div style="font-size:3rem">🕵️</div>
+      <div style="font-size:1.8rem;font-weight:900;color:#58a6ff">المتسلل</div>
+    </div>
+    <div class="card" style="background:#161b22;border-color:#30363d">
+      <div class="input-group">
+        <label style="color:#8b949e">اسمك</label>
+        <input id="uc-player-name" placeholder="أدخل اسمك..." maxlength="15">
+      </div>
+      <div class="input-group">
+        <label style="color:#8b949e">كود الغرفة</label>
+        <input id="uc-room-code-input" placeholder="XXXX — اتركه فارغ لإنشاء غرفة جديدة" maxlength="6" style="text-transform:uppercase;letter-spacing:0.2em">
+      </div>
+      <button class="big-btn blue" onclick="joinUCRoom()">🚪 دخول</button>
+    </div>
+  </div>
+
+  <!-- WAITING ADMIN -->
+  <div id="uc-waiting" style="display:none">
+    <div class="undercover-header">
+      <div class="undercover-logo">🕵️ المتسلل</div>
+      <div style="display:flex;align-items:center;gap:0.5rem"><span class="status-dot" style="background:#58a6ff"></span><span style="font-size:0.8rem;color:#8b949e">انتظار</span></div>
+    </div>
+    <div style="padding:1rem">
+      <div class="card" style="background:#161b22;border-color:#30363d;text-align:center">
+        <div style="font-size:0.85rem;color:#8b949e;margin-bottom:0.3rem">كود الغرفة</div>
+        <div class="room-code" style="color:#58a6ff;border-color:#58a6ff33;background:#0d1117" id="uc-room-display">----</div>
+        <button class="btn btn-outline btn-sm" onclick="copyRoomCode('undercover')" style="margin-top:0.75rem;width:auto;padding:0.4rem 1rem;border-color:#30363d;color:#8b949e">📋 نسخ</button>
+      </div>
+      <div class="card" style="background:#161b22;border-color:#30363d">
+        <h2>🎯 المجالات</h2>
+        <div style="margin-bottom:0.75rem;font-size:0.8rem;color:#8b949e">اختر مجال أو أكثر للكلمات:</div>
+        <div id="uc-categories"></div>
+        <div style="margin-top:1rem">
+          <label style="font-size:0.85rem;color:#8b949e;display:block;margin-bottom:0.4rem">أو أدخل كلمتين يدويًا:</label>
+          <div class="grid-2">
+            <input id="uc-custom-word1" placeholder="الكلمة العامة" style="background:#0d1117;border-color:#30363d;color:#e6edf3">
+            <input id="uc-custom-word2" placeholder="كلمة المتسلل" style="background:#0d1117;border-color:#30363d;color:#e6edf3">
+          </div>
+        </div>
+      </div>
+      <div class="card" style="background:#161b22;border-color:#30363d">
+        <h2>👥 اللاعبون (<span id="uc-player-count">0</span>)</h2>
+        <div class="waiting-players" id="uc-waiting-players"></div>
+      </div>
+      <button class="big-btn blue" onclick="startUCGame()" id="uc-start-btn" disabled>▶️ ابدأ اللعبة</button>
+    </div>
+  </div>
+
+  <!-- WAITING PLAYER -->
+  <div id="uc-waiting-player" style="display:none">
+    <div class="undercover-header">
+      <div class="undercover-logo">🕵️ المتسلل</div>
+    </div>
+    <div style="padding:1rem">
+      <div class="card" style="background:#161b22;border-color:#30363d;text-align:center;padding:3rem 1rem">
+        <div style="font-size:3rem;margin-bottom:1rem">⏳</div>
+        <div style="font-size:1.1rem;font-weight:700;color:#e6edf3;margin-bottom:0.5rem">في انتظار المدير</div>
+        <div class="waiting-players" id="uc-waiting-players-view" style="justify-content:center;margin-top:1rem"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORD REVEAL -->
+  <div id="uc-word-reveal" style="display:none">
+    <div class="undercover-header">
+      <div class="undercover-logo">🕵️ المتسلل</div>
+    </div>
+    <div style="padding:1rem;max-width:400px;margin:0 auto">
+      <div style="text-align:center;margin-bottom:1.5rem">
+        <div style="font-size:1rem;color:#8b949e">مرحبًا <strong id="uc-reveal-name" style="color:#e6edf3"></strong></div>
+        <div style="font-size:0.85rem;color:#555;margin-top:0.3rem">شاهد كلمتك وأخفِ الشاشة</div>
+      </div>
+      <div class="word-card" id="uc-word-card">
+        <div class="word-label" id="uc-word-label">كلمتك هي:</div>
+        <div class="word-reveal" id="uc-word-display">...</div>
+      </div>
+      <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:1rem;margin-top:1rem;font-size:0.85rem;color:#8b949e;text-align:center">
+        <span id="uc-role-hint">اصف الكلمة دون أن تقولها مباشرة</span>
+      </div>
+      <button class="big-btn blue" onclick="doneReveal()" style="margin-top:1.5rem">✅ حفظت كلمتي</button>
+    </div>
+  </div>
+
+  <!-- MAIN UC GAME -->
+  <div id="uc-game" style="display:none">
+    <div class="undercover-header">
+      <div class="undercover-logo">🕵️ المتسلل</div>
+      <div id="uc-round-badge" class="phase-badge" style="background:#0d2040;color:#58a6ff;border-color:#58a6ff33">جولة 1</div>
+    </div>
+    <div style="padding:1rem">
+
+      <!-- EVENTS -->
+      <div class="uc-events-panel">
+        <div class="uc-events-title">📋 الأحداث</div>
+        <div id="uc-events-grid">
+          <div class="uc-event-item" style="color:#555;justify-content:center">لا أحداث بعد...</div>
+        </div>
+      </div>
+
+      <!-- PLAYERS + VOTE -->
+      <div class="card" style="background:#161b22;border-color:#30363d">
+        <h2 id="uc-players-title" style="color:#e6edf3">👥 اللاعبون</h2>
+        <div id="uc-players-list"></div>
+      </div>
+
+      <!-- ADMIN CONTROLS -->
+      <div class="card" id="uc-admin-controls" style="display:none;background:#161b22;border-color:#30363d">
+        <h2 style="color:#e6edf3">🎮 تحكم المدير</h2>
+        <div class="grid-2">
+          <button class="btn btn-blue" onclick="advanceUCPhase()">⏭️ التالي</button>
+          <button class="btn btn-outline" onclick="newUCRound()" style="border-color:#30363d;color:#8b949e">🔄 جولة جديدة</button>
+        </div>
+        <button class="btn btn-outline" onclick="switchGame()" style="margin-top:0.5rem;border-color:#e63946;color:#e63946">🔀 تغيير اللعبة</button>
+      </div>
+
+      <button class="btn btn-outline" onclick="showHome()" style="margin-top:0.5rem;border-color:#30363d;color:#8b949e">🏠 الرئيسية</button>
+
+      <!-- RENAME -->
+      <div class="card" style="background:#161b22;border-color:#30363d;margin-top:0.5rem">
+        <h2 style="font-size:0.9rem;margin-bottom:0.6rem;color:#e6edf3">✏️ تغيير اسمك</h2>
+        <div style="display:flex;gap:0.5rem">
+          <input id="undercover-rename-input" placeholder="الاسم الجديد..." maxlength="15" style="flex:1;background:#0d1117;border-color:#30363d;color:#e6edf3">
+          <button class="btn btn-blue btn-sm" onclick="renameInGame('undercover')" style="width:auto;margin-top:0;padding:0.6rem 1rem">تغيير</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- UC GAME OVER -->
+<div class="gameover-overlay" id="uc-gameover">
+  <div class="gameover-card" style="border-color:#58a6ff;box-shadow:0 0 60px rgba(88,166,255,0.2)">
+    <div class="gameover-emoji" id="uc-go-emoji">🕵️</div>
+    <div class="gameover-title" id="uc-go-title" style="color:#58a6ff">انتهت الجولة</div>
+    <div class="gameover-desc" id="uc-go-desc"></div>
+    <button class="big-btn blue" onclick="closeUCGameover()">جولة جديدة</button>
+  </div>
+</div>
+
+<!-- ==================== FIREBASE + GAME LOGIC ==================== -->
+<script type="module">
+// =====================================================================
+// FIREBASE CONFIG — استبدل هذه البيانات ببيانات مشروعك
+// =====================================================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, get, onValue, update, push, remove, serverTimestamp }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDV-EPYVk9Kv6S5H3rPcMusWz5cPbg4k3o",
+  authDomain: "mafia-motaslil.firebaseapp.com",
+  databaseURL: "https://mafia-motaslil-default-rtdb.firebaseio.com",
+  projectId: "mafia-motaslil",
+  storageBucket: "mafia-motaslil.firebasestorage.app",
+  messagingSenderId: "656080823261",
+  appId: "1:656080823261:web:003fd61649d1fb6b3e8c34",
+  measurementId: "G-MRSL8LZJDT"
+};
+
+// =====================================================================
+// DEMO MODE — يشتغل بدون Firebase لو ما ضفتيش الكونفيغ
+// =====================================================================
+let db = null;
+let demoMode = false;
+
+try {
+  const app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+} catch(e) {
+  demoMode = true;
+  console.log("Demo mode: no Firebase config");
+}
+
+// =====================================================================
+// UTILS
+// =====================================================================
+function randCode() {
+  return Math.random().toString(36).substr(2,5).toUpperCase();
+}
+
+function showToast(msg, dur=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+function now() {
+  const d = new Date();
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+window.copyRoomCode = function(game) {
+  const code = game === 'mafia'
+    ? document.getElementById('m-room-display').textContent
+    : document.getElementById('uc-room-display').textContent;
+  navigator.clipboard.writeText(code).then(() => showToast('✅ تم نسخ الكود!'));
+};
+
+window.toggleSetting = function(el) { el.classList.toggle('on'); };
+
+// =====================================================================
+// NAVIGATION
+// =====================================================================
+// =====================================================================
+// LOBBY STATE
+// =====================================================================
+let lobbyState = {
+  roomCode: '', playerId: '', playerName: '', isAdmin: false,
+  players: {}, selectedGame: null
+};
+let lobbySelectedCategories = [];
+
+// =====================================================================
+// NAVIGATION
+// =====================================================================
+window.showHome = function() {
+  document.getElementById('home-screen').style.display = 'flex';
+  document.getElementById('lobby-screen').style.display = 'none';
+  document.getElementById('lobby-waiting-screen').style.display = 'none';
+  document.getElementById('mafia-screen').classList.remove('active');
+  document.getElementById('undercover-screen').classList.remove('active');
+  document.getElementById('switch-btn').style.display = 'none';
+  document.body.classList.remove('undercover-theme');
+};
+
+window.leaveLobby = function() {
+  showHome();
+};
+
+window.copyLobbyCode = function() {
+  navigator.clipboard.writeText(lobbyState.roomCode).then(() => showToast('✅ تم نسخ الكود!'));
+};
+
+// =====================================================================
+// CREATE / JOIN ROOM
+// =====================================================================
+window.createRoom = async function() {
+  const name = document.getElementById('home-create-name').value.trim();
+  if (!name) return showToast('⚠️ أدخل اسمك');
+
+  const code = randCode();
+  lobbyState.roomCode = code;
+  lobbyState.playerName = name;
+  lobbyState.isAdmin = true;
+  lobbyState.playerId = name + '_' + Date.now();
+  lobbyState.players = {};
+  lobbyState.players[lobbyState.playerId] = { id: lobbyState.playerId, name, isAdmin: true };
+
+  if (!demoMode) {
+    await set(ref(db, `lobby/${code}`), {
+      adminId: lobbyState.playerId,
+      players: lobbyState.players,
+      game: null, started: false
+    });
+  }
+
+  document.getElementById('lobby-room-code').textContent = code;
+  document.getElementById('home-screen').style.display = 'none';
+  document.getElementById('lobby-screen').style.display = 'block';
+  renderLobbyCategories();
+  updateLobbyPlayers();
+
+  if (!demoMode) listenLobby();
+};
+
+window.joinRoom = async function() {
+  const name = document.getElementById('home-join-name').value.trim();
+  const code = document.getElementById('home-join-code').value.trim().toUpperCase();
+  if (!name) return showToast('⚠️ أدخل اسمك');
+  if (!code) return showToast('⚠️ أدخل كود الغرفة');
+
+  lobbyState.roomCode = code;
+  lobbyState.playerName = name;
+  lobbyState.isAdmin = false;
+  lobbyState.playerId = name + '_' + Date.now();
+
+  if (demoMode) {
+    showToast('⚠️ وضع التجربة: Firebase مطلوب للانضمام من جهاز آخر');
+    lobbyState.players = {};
+    lobbyState.players[lobbyState.playerId] = { id: lobbyState.playerId, name, isAdmin: false };
+    document.getElementById('lobby-wait-code').textContent = code;
+    document.getElementById('home-screen').style.display = 'none';
+    document.getElementById('lobby-waiting-screen').style.display = 'block';
+    updateLobbyWaitingPlayers();
+    return;
+  }
+
+  const snap = await get(ref(db, `lobby/${code}`));
+  if (!snap.exists()) return showToast('❌ الغرفة غير موجودة');
+  const data = snap.val();
+  if (data.started) return showToast('❌ اللعبة بدأت بالفعل');
+
+  await update(ref(db, `lobby/${code}/players`), {
+    [lobbyState.playerId]: { id: lobbyState.playerId, name, isAdmin: false }
+  });
+
+  document.getElementById('lobby-wait-code').textContent = code;
+  document.getElementById('home-screen').style.display = 'none';
+  document.getElementById('lobby-waiting-screen').style.display = 'block';
+  listenLobby();
+};
+
+// =====================================================================
+// LOBBY LISTEN
+// =====================================================================
+function listenLobby() {
+  onValue(ref(db, `lobby/${lobbyState.roomCode}`), snap => {
+    if (!snap.exists()) return;
+    const data = snap.val();
+    lobbyState.players = data.players || {};
+
+    updateLobbyPlayers();
+    updateLobbyWaitingPlayers();
+
+    // If game started, switch to that game
+    if (data.started && data.game) {
+      startGameFromLobby(data.game, data.gameSettings || {});
+    }
+  });
+}
+
+function updateLobbyPlayers() {
+  const players = Object.values(lobbyState.players || {});
+  const el = document.getElementById('lobby-player-count');
+  if (el) el.textContent = players.length;
+  const list = document.getElementById('lobby-players-list');
+  if (list) {
+    list.innerHTML = players.map(p =>
+      `<div class="waiting-player-chip"><span class="status-dot"></span>${p.name}${p.isAdmin ? ' 👑' : ''}</div>`
+    ).join('');
+  }
+  updateLobbyStartBtn();
+}
+
+function updateLobbyWaitingPlayers() {
+  const players = Object.values(lobbyState.players || {});
+  const list = document.getElementById('lobby-wait-players');
+  if (list) {
+    list.innerHTML = players.map(p =>
+      `<div class="waiting-player-chip"><span class="status-dot"></span>${p.name}${p.isAdmin ? ' 👑' : ''}</div>`
+    ).join('');
+  }
+}
+
+function updateLobbyStartBtn() {
+  const btn = document.getElementById('lobby-start-btn');
+  if (!btn || !lobbyState.isAdmin) return;
+  const count = Object.values(lobbyState.players || {}).length;
+  const game = lobbyState.selectedGame;
+  const minPlayers = game === 'mafia' ? 4 : game === 'undercover' ? 3 : 99;
+  btn.disabled = count < minPlayers || !game;
+}
+
+// =====================================================================
+// GAME SELECTION IN LOBBY
+// =====================================================================
+window.selectLobbyGame = function(game) {
+  lobbyState.selectedGame = game;
+  document.getElementById('lobby-mafia-card').style.outline = game === 'mafia' ? '3px solid #e63946' : '';
+  document.getElementById('lobby-uc-card').style.outline = game === 'undercover' ? '3px solid #58a6ff' : '';
+  document.getElementById('lobby-mafia-settings').style.display = game === 'mafia' ? 'block' : 'none';
+  document.getElementById('lobby-uc-settings').style.display = game === 'undercover' ? 'block' : 'none';
+  document.getElementById('lobby-start-btn').style.display = 'block';
+  updateLobbyStartBtn();
+};
+
+function renderLobbyCategories() {
+  const el = document.getElementById('lobby-uc-categories');
+  if (!el) return;
+  el.innerHTML = Object.keys(UC_CATEGORIES).map(cat =>
+    `<span class="cat-tag" onclick="toggleLobbyCategory('${cat}')" id="lcat-${CSS.escape(cat)}">${cat}</span>`
+  ).join('');
+}
+
+window.toggleLobbyCategory = function(cat) {
+  const idx = lobbySelectedCategories.indexOf(cat);
+  if (idx > -1) lobbySelectedCategories.splice(idx, 1);
+  else lobbySelectedCategories.push(cat);
+  document.querySelectorAll('.cat-tag').forEach(el => {
+    if (el.id && el.id.startsWith('lcat-')) {
+      el.classList.toggle('selected', lobbySelectedCategories.includes(el.textContent));
+    }
+  });
+};
+
+// =====================================================================
+// RENAME IN LOBBY
+// =====================================================================
+window.renameLobbyPlayer = async function(who) {
+  const inputId = who === 'admin' ? 'lobby-rename-admin-input' : 'lobby-rename-input';
+  const newName = document.getElementById(inputId)?.value.trim();
+  if (!newName) return showToast('⚠️ أدخل الاسم الجديد');
+  if (newName === lobbyState.playerName) return showToast('⚠️ نفس الاسم الحالي');
+
+  const oldName = lobbyState.playerName;
+  lobbyState.playerName = newName;
+  lobbyState.players[lobbyState.playerId].name = newName;
+
+  if (!demoMode) {
+    await update(ref(db, `lobby/${lobbyState.roomCode}/players/${lobbyState.playerId}`), { name: newName });
+  } else {
+    updateLobbyPlayers();
+    updateLobbyWaitingPlayers();
+  }
+  document.getElementById(inputId).value = '';
+  showToast(`✅ ${oldName} غيّر اسمه إلى ${newName}`);
+};
+
+// =====================================================================
+// START GAME FROM LOBBY
+// =====================================================================
+window.startLobbyGame = async function() {
+  if (!lobbyState.isAdmin) return;
+  const game = lobbyState.selectedGame;
+  const players = Object.values(lobbyState.players || {});
+
+  if (!game) return showToast('⚠️ اختر اللعبة أولاً');
+  if (game === 'mafia' && players.length < 4) return showToast('⚠️ تحتاج 4+ لاعبين للمافيا');
+  if (game === 'undercover' && players.length < 3) return showToast('⚠️ تحتاج 3+ لاعبين للمتسلل');
+
+  const gameSettings = {};
+
+  if (game === 'mafia') {
+    gameSettings.mafiaCount = document.getElementById('lobby-mafia-count').value;
+    gameSettings.detective = document.getElementById('lobby-toggle-detective').classList.contains('on');
+    gameSettings.doctor = document.getElementById('lobby-toggle-doctor').classList.contains('on');
+  } else {
+    const custom1 = document.getElementById('lobby-custom-word1')?.value.trim();
+    const custom2 = document.getElementById('lobby-custom-word2')?.value.trim();
+    gameSettings.customWord1 = custom1;
+    gameSettings.customWord2 = custom2;
+    gameSettings.categories = lobbySelectedCategories;
+  }
+
+  if (!demoMode) {
+    await update(ref(db, `lobby/${lobbyState.roomCode}`), { started: true, game, gameSettings });
+  } else {
+    startGameFromLobby(game, gameSettings);
+  }
+};
+
+function startGameFromLobby(game, gameSettings) {
+  const players = Object.values(lobbyState.players || {});
+  document.getElementById('lobby-screen').style.display = 'none';
+  document.getElementById('lobby-waiting-screen').style.display = 'none';
+  document.getElementById('switch-btn').style.display = 'flex';
+
+  if (game === 'mafia') {
+    launchMafiaFromLobby(players, gameSettings);
+  } else if (game === 'undercover') {
+    launchUCFromLobby(players, gameSettings);
+  }
+}
+
+function launchMafiaFromLobby(players, settings) {
+  document.body.classList.remove('undercover-theme');
+  document.getElementById('mafia-screen').classList.add('active');
+  document.getElementById('undercover-screen').classList.remove('active');
+
+  // Transfer lobby state to mState
+  mState.roomCode = lobbyState.roomCode;
+  mState.playerId = lobbyState.playerId;
+  mState.playerName = lobbyState.playerName;
+  mState.isAdmin = lobbyState.isAdmin;
+  mState.players = {};
+  players.forEach(p => { mState.players[p.id] = { ...p, eliminated: false }; });
+
+  if (mState.isAdmin) {
+    // Admin directly starts the game
+    const roles = assignMafiaRoles(players, settings);
+    const updatedPlayers = {};
+    players.forEach(p => { updatedPlayers[p.id] = { ...p, role: roles[p.id], eliminated: false }; });
+    mState.players = updatedPlayers;
+    mState.phase = 'day';
+    mState.events = [{ text: '🎮 بدأت المافيا! مرحلة النهار الأولى.', time: now(), isNew: true }];
+    mState.myRole = roles[mState.playerId];
+    mState.roleShown = true;
+
+    if (!demoMode) {
+      update(ref(db, `mafia/${mState.roomCode}`), {
+        phase: 'day', round: 1, players: updatedPlayers,
+        roleReveal: roles, votes: {},
+        events: mState.events
+      });
+      listenMafiaRoom();
+    }
+
+    showMafiaView('game');
+    showRoleReveal(mState.myRole);
+    renderMafiaPlayers();
+    renderMafiaEvents();
+    updateMafiaPhaseUI();
+  } else {
+    if (!demoMode) {
+      update(ref(db, `mafia/${mState.roomCode}/players`), {
+        [mState.playerId]: { id: mState.playerId, name: mState.playerName, isAdmin: false, eliminated: false }
+      });
+      listenMafiaRoom();
+    }
+    showMafiaView('waiting-player');
+  }
+}
+
+function launchUCFromLobby(players, settings) {
+  document.body.classList.add('undercover-theme');
+  document.getElementById('undercover-screen').classList.add('active');
+  document.getElementById('mafia-screen').classList.remove('active');
+
+  ucState.roomCode = lobbyState.roomCode;
+  ucState.playerId = lobbyState.playerId;
+  ucState.playerName = lobbyState.playerName;
+  ucState.isAdmin = lobbyState.isAdmin;
+  ucState.players = {};
+  players.forEach(p => { ucState.players[p.id] = { ...p, eliminated: false }; });
+
+  // Store settings for when game starts
+  ucLobbySettings = settings;
+
+  if (ucState.isAdmin) {
+    const [word, spyWord] = pickUCWordsFromSettings(settings);
+    const spyId = players[Math.floor(Math.random() * players.length)].id;
+    const wordReveal = {};
+    players.forEach(p => {
+      wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
+    });
+
+    ucState.phase = 'reveal';
+    ucState.round = 1;
+    const myData = wordReveal[ucState.playerId];
+    ucState.myWord = myData.word;
+    ucState.isSpy = myData.isSpy;
+    ucState.wordRevealed = true;
+    ucState.events = [{ text: '🎮 بدأت اللعبة! شاهد كلمتك...', time: now(), isNew: true }];
+
+    if (!demoMode) {
+      update(ref(db, `undercover/${ucState.roomCode}`), {
+        phase: 'reveal', round: 1,
+        players: Object.fromEntries(players.map(p => [p.id, { ...p, eliminated: false }])),
+        spyId, word, spyWord, wordReveal, votes: {},
+        events: ucState.events
+      });
+      listenUCRoom();
+    }
+    showUCWordReveal();
+  } else {
+    if (!demoMode) {
+      update(ref(db, `undercover/${ucState.roomCode}/players`), {
+        [ucState.playerId]: { id: ucState.playerId, name: ucState.playerName, isAdmin: false, eliminated: false }
+      });
+      listenUCRoom();
+    }
+    showUCView('waiting-player');
+  }
+}
+
+let ucLobbySettings = {};
+
+function pickUCWordsFromSettings(settings) {
+  if (settings.customWord1 && settings.customWord2) return [settings.customWord1, settings.customWord2];
+  const cats = (settings.categories && settings.categories.length > 0) ? settings.categories : Object.keys(UC_CATEGORIES);
+  const randomCat = cats[Math.floor(Math.random() * cats.length)];
+  const pairs = UC_CATEGORIES[randomCat] || UC_CATEGORIES['🍕 طعام'];
+  return pairs[Math.floor(Math.random() * pairs.length)];
+}
+
+// =====================================================================
+// RENAME DURING GAME (in-game rename)
+// =====================================================================
+window.renameInGame = async function(game) {
+  const inputId = `${game}-rename-input`;
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const newName = el.value.trim();
+  if (!newName) return showToast('⚠️ أدخل الاسم الجديد');
+
+  const state = game === 'mafia' ? mState : ucState;
+  const oldName = state.playerName;
+  if (newName === oldName) return showToast('⚠️ نفس الاسم');
+
+  state.playerName = newName;
+  state.players[state.playerId].name = newName;
+  el.value = '';
+
+  const eventText = `✏️ ${oldName} غيّر اسمه إلى ${newName}`;
+
+  if (game === 'mafia') {
+    addMafiaEvent(eventText);
+    if (!demoMode) {
+      await update(ref(db, `mafia/${state.roomCode}/players/${state.playerId}`), { name: newName });
+      await update(ref(db, `mafia/${state.roomCode}/events`), Object.fromEntries(state.events.map((e,i)=>[i,e])));
+    }
+    renderMafiaPlayers();
+  } else {
+    addUCEvent(eventText);
+    if (!demoMode) {
+      await update(ref(db, `undercover/${state.roomCode}/players/${state.playerId}`), { name: newName });
+      await update(ref(db, `undercover/${state.roomCode}/events`), Object.fromEntries(state.events.map((e,i)=>[i,e])));
+    }
+    renderUCPlayers();
+  }
+  showToast(`✅ تم تغيير الاسم إلى ${newName}`);
+};
+
+window.goToGame = function(game) {
+  // Legacy: kept for switch button if needed
+};
+
+window.returnToLobby = function() {
+  showHome();
+};
+
+// Switch game: admin only — goes back to lobby for game selection
+window.switchGame = async function() {
+  if (!lobbyState.isAdmin) return showToast('⚠️ فقط المدير يمكنه تغيير اللعبة');
+  document.getElementById('mafia-screen').classList.remove('active');
+  document.getElementById('undercover-screen').classList.remove('active');
+  document.getElementById('switch-btn').style.display = 'none';
+  document.body.classList.remove('undercover-theme');
+
+  // Reset started state so players can rejoin selection
+  if (!demoMode) {
+    await update(ref(db, `lobby/${lobbyState.roomCode}`), { started: false, game: null });
+  }
+  lobbyState.selectedGame = null;
+  document.getElementById('lobby-room-code').textContent = lobbyState.roomCode;
+  document.getElementById('lobby-screen').style.display = 'block';
+  updateLobbyPlayers();
+  renderLobbyCategories();
+};
+
+
+// =====================================================================
+// ==================== MAFIA GAME ====================
+// =====================================================================
+let mState = {
+  roomCode: '', playerId: '', playerName: '', isAdmin: false,
+  phase: 'waiting', // waiting | day | night | vote
+  players: {}, events: [], myRole: '',
+  mafiaTarget: '', detectiveTarget: '', doctorTarget: '',
+  votes: {}, round: 1
+};
+let mListeners = [];
+
+const MAFIA_ROLES = {
+  mafia: { emoji: '🔫', name: 'مافيا', desc: 'ستقتل مواطنًا كل ليلة. تظاهر بأنك بريء خلال النهار!', color: '#e63946' },
+  detective: { emoji: '🔍', name: 'محقق', desc: 'كل ليلة تكتشف هوية لاعب واحد. استخدم معلوماتك بذكاء!', color: '#ffd60a' },
+  doctor: { emoji: '💊', name: 'طبيب', desc: 'كل ليلة تحمي لاعبًا من الموت. يمكنك حماية نفسك!', color: '#52b788' },
+  citizen: { emoji: '👤', name: 'مواطن', desc: 'ساعد في كشف المافيا خلال النقاشات والتصويت!', color: '#aaa' }
+};
+
+function addMafiaEvent(text, isNew=true) {
+  const MAX = 5;
+  mState.events.unshift({ text, time: now(), isNew });
+  if (mState.events.length > MAX) mState.events = mState.events.slice(0, MAX);
+  renderMafiaEvents();
+}
+
+function renderMafiaEvents() {
+  const grid = document.getElementById('m-events-grid');
+  if (!grid) return;
+  if (mState.events.length === 0) {
+    grid.innerHTML = '<div class="event-item" style="color:#555;justify-content:center">لا أحداث بعد...</div>';
+    return;
+  }
+  grid.innerHTML = mState.events.map((e, i) =>
+    `<div class="event-item ${i===0 && e.isNew ? 'new' : ''}">
+      <span class="event-time">${e.time}</span>
+      <span>${e.text}</span>
+    </div>`
+  ).join('');
+}
+
+function renderMafiaPlayers() {
+  const grid = document.getElementById('m-players-grid');
+  if (!grid) return;
+  const title = document.getElementById('m-players-title');
+  const isVotePhase = mState.phase === 'vote';
+
+  if (isVotePhase && title) title.textContent = '🗳️ صوّت لإقصاء لاعب';
+  else if (title) title.textContent = '👥 اللاعبون';
+
+  const players = Object.values(mState.players || {});
+  grid.innerHTML = players.map(p => {
+    const eliminated = p.eliminated;
+    const roleData = MAFIA_ROLES[p.role] || MAFIA_ROLES.citizen;
+    const showRole = mState.isAdmin || p.id === mState.playerId || eliminated;
+    const voteCount = Object.values(mState.votes || {}).filter(v => v === p.id).length;
+    const myVote = mState.votes[mState.playerId] === p.id;
+
+    return `<div class="player-item ${eliminated ? 'eliminated' : ''} ${myVote ? 'voted' : ''}">
+      <div class="player-name">${p.name}${p.id === mState.playerId ? ' (أنت)' : ''}</div>
+      ${showRole ? `<div class="player-role ${p.role}" style="color:${roleData.color}">${roleData.emoji} ${roleData.name}</div>` : ''}
+      ${voteCount > 0 ? `<div class="vote-count">🗳️ ${voteCount}</div>` : ''}
+      ${isVotePhase && !eliminated && p.id !== mState.playerId ? 
+        `<button class="vote-btn ${myVote ? 'voted' : ''}" onclick="voteMafia('${p.id}')">
+          ${myVote ? '✅ صوّتت' : '🗳️ صوّت'}
+        </button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+window.joinMafiaRoom = async function() {
+  const name = document.getElementById('m-player-name').value.trim();
+  const codeInput = document.getElementById('m-room-code-input').value.trim().toUpperCase();
+  if (!name) return showToast('⚠️ أدخل اسمك');
+
+  const isNew = !codeInput;
+  const code = isNew ? randCode() : codeInput;
+  mState.roomCode = code;
+  mState.playerName = name;
+  mState.isAdmin = isNew;
+  mState.playerId = name + '_' + Date.now();
+
+  if (demoMode) {
+    // DEMO: run locally
+    if (isNew) {
+      mState.players = {};
+      mState.players[mState.playerId] = { id: mState.playerId, name, isAdmin: true, eliminated: false };
+      mState.phase = 'waiting';
+      document.getElementById('m-room-display').textContent = code;
+      showMafiaView('waiting');
+    } else {
+      showToast('⚠️ وضع التجربة: شارك نفس الصفحة مع أصدقائك (Firebase مطلوب للمتعدد)');
+      mState.players[mState.playerId] = { id: mState.playerId, name, isAdmin: false, eliminated: false };
+      showMafiaView('waiting');
+    }
+    updateMafiaWaiting();
+    return;
+  }
+
+  const roomRef = ref(db, `mafia/${code}`);
+  if (isNew) {
+    await set(roomRef, {
+      phase: 'waiting',
+      adminId: mState.playerId,
+      round: 1,
+      players: { [mState.playerId]: { id: mState.playerId, name, isAdmin: true, eliminated: false } },
+      events: [],
+      votes: {}
+    });
+    document.getElementById('m-room-display').textContent = code;
+  } else {
+    const snap = await get(roomRef);
+    if (!snap.exists()) return showToast('❌ الغرفة غير موجودة');
+    await update(ref(db, `mafia/${code}/players`), {
+      [mState.playerId]: { id: mState.playerId, name, isAdmin: false, eliminated: false }
+    });
+  }
+
+  listenMafiaRoom();
+  showMafiaView('waiting');
+};
+
+function listenMafiaRoom() {
+  const roomRef = ref(db, `mafia/${mState.roomCode}`);
+  onValue(roomRef, snap => {
+    if (!snap.exists()) return;
+    const data = snap.val();
+    mState.players = data.players || {};
+    mState.phase = data.phase || 'waiting';
+    mState.events = data.events ? (Array.isArray(data.events) ? data.events : Object.values(data.events)).slice(0, 5) : [];
+    mState.votes = data.votes || {};
+    mState.round = data.round || 1;
+
+    if (data.phase === 'waiting') {
+      updateMafiaWaiting();
+    } else {
+      if (data.roleReveal && data.roleReveal[mState.playerId] && !mState.roleShown) {
+        mState.myRole = data.roleReveal[mState.playerId];
+        mState.roleShown = true;
+        showRoleReveal(mState.myRole);
+      }
+      showMafiaView('game');
+      renderMafiaPlayers();
+      renderMafiaEvents();
+      updateMafiaPhaseUI();
+    }
+  });
+}
+
+function updateMafiaWaiting() {
+  const players = Object.values(mState.players || {});
+  const count = players.length;
+  const el = document.getElementById('m-player-count');
+  if (el) el.textContent = count;
+
+  const waiting = document.getElementById('m-waiting-players');
+  if (waiting) {
+    waiting.innerHTML = players.map(p =>
+      `<div class="waiting-player-chip"><span class="status-dot"></span>${p.name}${p.isAdmin ? ' 👑' : ''}</div>`
+    ).join('');
+  }
+
+  const waitingView = document.getElementById('m-waiting-players-view');
+  if (waitingView) {
+    waitingView.innerHTML = players.map(p =>
+      `<div class="waiting-player-chip"><span class="status-dot"></span>${p.name}</div>`
+    ).join('');
+  }
+
+  const startBtn = document.getElementById('m-start-btn');
+  if (startBtn) startBtn.disabled = count < 4;
+
+  if (mState.isAdmin) showMafiaView('waiting');
+  else showMafiaView('waiting-player');
+}
+
+function showMafiaView(view) {
+  document.getElementById('mafia-join').style.display = 'none';
+  document.getElementById('mafia-waiting').style.display = 'none';
+  document.getElementById('mafia-waiting-player').style.display = 'none';
+  document.getElementById('mafia-game').style.display = 'none';
+  if (view === 'join') document.getElementById('mafia-join').style.display = 'block';
+  if (view === 'waiting') document.getElementById('mafia-waiting').style.display = 'block';
+  if (view === 'waiting-player') document.getElementById('mafia-waiting-player').style.display = 'block';
+  if (view === 'game') document.getElementById('mafia-game').style.display = 'block';
+}
+
+function assignMafiaRoles(players, settings) {
+  const ids = players.map(p => p.id);
+  const shuffled = [...ids].sort(() => Math.random() - 0.5);
+  const count = ids.length;
+  const mafiaCount = settings.mafiaCount === 'auto' ? (count >= 8 ? 2 : 1) : parseInt(settings.mafiaCount);
+  const roles = {};
+
+  for (let i = 0; i < shuffled.length; i++) {
+    if (i < mafiaCount) roles[shuffled[i]] = 'mafia';
+    else if (i === mafiaCount && settings.detective) roles[shuffled[i]] = 'detective';
+    else if (i === mafiaCount + (settings.detective ? 1 : 0) && settings.doctor) roles[shuffled[i]] = 'doctor';
+    else roles[shuffled[i]] = 'citizen';
+  }
+  return roles;
+}
+
+window.startMafiaGame = async function() {
+  const players = Object.values(mState.players || {});
+  if (players.length < 4) return showToast('⚠️ تحتاج على الأقل 4 لاعبين');
+
+  const settings = {
+    mafiaCount: document.getElementById('m-mafia-count').value,
+    detective: document.getElementById('m-toggle-detective').classList.contains('on'),
+    doctor: document.getElementById('m-toggle-doctor').classList.contains('on')
+  };
+
+  const roles = assignMafiaRoles(players, settings);
+  const updatedPlayers = {};
+  players.forEach(p => {
+    updatedPlayers[p.id] = { ...p, role: roles[p.id], eliminated: false };
+  });
+
+  const updates = {
+    phase: 'day',
+    round: 1,
+    players: updatedPlayers,
+    roleReveal: roles,
+    votes: {},
+    events: [{ text: '🎮 بدأت اللعبة! مرحلة النهار الأولى.', time: now(), isNew: true }]
+  };
+
+  if (demoMode) {
+    mState.players = updatedPlayers;
+    mState.phase = 'day';
+    mState.events = updates.events;
+    mState.myRole = roles[mState.playerId];
+    mState.roleShown = true;
+    showMafiaView('game');
+    showRoleReveal(mState.myRole);
+    renderMafiaPlayers();
+    renderMafiaEvents();
+    updateMafiaPhaseUI();
+    return;
+  }
+
+  await update(ref(db, `mafia/${mState.roomCode}`), updates);
+};
+
+function showRoleReveal(role) {
+  const r = MAFIA_ROLES[role] || MAFIA_ROLES.citizen;
+  document.getElementById('reveal-emoji').textContent = r.emoji;
+  document.getElementById('reveal-role').textContent = r.name;
+  document.getElementById('reveal-desc').textContent = r.desc;
+  document.getElementById('role-reveal-overlay').style.display = 'flex';
+}
+
+window.closeRoleReveal = function() {
+  document.getElementById('role-reveal-overlay').style.display = 'none';
+};
+
+function updateMafiaPhaseUI() {
+  const badge = document.getElementById('m-phase-badge');
+  const adminCtrl = document.getElementById('m-admin-controls');
+  const nightActions = document.getElementById('m-admin-night-actions');
+  const nightSelect = document.getElementById('m-night-select-mafia');
+  const myNight = document.getElementById('m-my-night-action');
+
+  if (mState.phase === 'day') {
+    if (badge) { badge.className = 'phase-badge day'; badge.textContent = '☀️ النهار'; }
+  } else if (mState.phase === 'night') {
+    if (badge) { badge.className = 'phase-badge night'; badge.textContent = '🌙 الليل'; }
+  } else if (mState.phase === 'vote') {
+    if (badge) { badge.className = 'phase-badge vote'; badge.textContent = '🗳️ التصويت'; }
+  }
+
+  if (adminCtrl) adminCtrl.style.display = mState.isAdmin ? 'block' : 'none';
+  if (nightActions) nightActions.style.display = mState.phase === 'night' && mState.isAdmin ? 'block' : 'none';
+
+  if (nightSelect && mState.phase === 'night' && mState.isAdmin) {
+    nightSelect.style.display = 'block';
+    const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && p.role !== 'mafia');
+    const sel = document.getElementById('m-mafia-target');
+    if (sel) sel.innerHTML = aliveNonMafia.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  }
+
+  // My night action
+  if (myNight) {
+    const myRole = mState.myRole;
+    if (mState.phase === 'night' && (myRole === 'detective' || myRole === 'doctor')) {
+      myNight.style.display = 'block';
+      const alive = Object.values(mState.players).filter(p => !p.eliminated);
+      const content = document.getElementById('m-night-action-content');
+      if (myRole === 'detective') {
+        content.innerHTML = `<div style="font-size:0.9rem;color:#ffd60a;margin-bottom:0.75rem">🔍 اختر لاعبًا لاكتشاف هويته:</div>
+          <select id="m-detective-sel">${alive.filter(p=>p.id!==mState.playerId).map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select>
+          <button class="btn btn-gold" onclick="doDetectiveAction()" style="margin-top:0.5rem">🔍 تحقق</button>`;
+      } else if (myRole === 'doctor') {
+        content.innerHTML = `<div style="font-size:0.9rem;color:#52b788;margin-bottom:0.75rem">💊 اختر لاعبًا لحمايته:</div>
+          <select id="m-doctor-sel">${alive.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select>
+          <button class="btn btn-green" onclick="doDoctorAction()" style="margin-top:0.5rem">💊 احمِ</button>`;
+      }
+    } else {
+      myNight.style.display = 'none';
+    }
+  }
+}
+
+window.doDetectiveAction = function() {
+  const sel = document.getElementById('m-detective-sel');
+  if (!sel) return;
+  const pid = sel.value;
+  const player = mState.players[pid];
+  if (!player) return;
+  const roleData = MAFIA_ROLES[player.role] || MAFIA_ROLES.citizen;
+  showToast(`🔍 ${player.name} هو: ${roleData.emoji} ${roleData.name}`, 4000);
+};
+
+window.doDoctorAction = function() {
+  const sel = document.getElementById('m-doctor-sel');
+  if (!sel) return;
+  mState.doctorTarget = sel.value;
+  showToast('💊 تم حفظ اختيارك!');
+};
+
+window.setMafiaTarget = function() {
+  const sel = document.getElementById('m-mafia-target');
+  if (sel) { mState.mafiaTarget = sel.value; showToast('✅ تم تحديد الهدف'); }
+};
+
+window.advanceMafiaPhase = async function() {
+  const phases = ['day', 'vote', 'night', 'day'];
+  const current = mState.phase;
+  const idx = phases.indexOf(current);
+  const next = phases[(idx + 1) % phases.length];
+
+  let eventText = '';
+  let updates = { phase: next, votes: {} };
+
+  if (current === 'vote') {
+    // Process votes — eliminate most voted
+    const voteCounts = {};
+    Object.values(mState.votes || {}).forEach(v => { voteCounts[v] = (voteCounts[v] || 0) + 1; });
+    const sorted = Object.entries(voteCounts).sort((a,b) => b[1]-a[1]);
+    if (sorted.length > 0) {
+      const [topId] = sorted[0];
+      const topPlayer = mState.players[topId];
+      if (topPlayer) {
+        updates[`players/${topId}/eliminated`] = true;
+        eventText = `⚖️ تم إقصاء ${topPlayer.name} (${MAFIA_ROLES[topPlayer.role]?.name || 'مواطن'})`;
+        // Check win
+        const remainingAfter = Object.values(mState.players).filter(p => !p.eliminated && p.id !== topId);
+        const mafiaLeft = remainingAfter.filter(p => p.role === 'mafia').length;
+        const civLeft = remainingAfter.filter(p => p.role !== 'mafia').length;
+        if (mafiaLeft === 0) { showMafiaGameover('citizens'); }
+        if (mafiaLeft >= civLeft) { showMafiaGameover('mafia'); }
+      }
+    } else {
+      eventText = '🗳️ لا أحد حصل على أصوات';
+    }
+  } else if (current === 'night') {
+    // Process night kill
+    const target = mState.mafiaTarget;
+    const docTarget = mState.doctorTarget;
+    if (target) {
+      if (target !== docTarget) {
+        updates[`players/${target}/eliminated`] = true;
+        const p = mState.players[target];
+        eventText = `💀 تم قتل ${p?.name || '؟'} الليلة الماضية`;
+        // Check win
+        const remainingAfter = Object.values(mState.players).filter(p => !p.eliminated && p.id !== target);
+        const mafiaLeft = remainingAfter.filter(p => p.role === 'mafia').length;
+        const civLeft = remainingAfter.filter(p => p.role !== 'mafia').length;
+        if (mafiaLeft === 0) { showMafiaGameover('citizens'); }
+        if (mafiaLeft >= civLeft) { showMafiaGameover('mafia'); }
+      } else {
+        eventText = '🛡️ الطبيب أنقذ الضحية الليلة!';
+      }
+      mState.mafiaTarget = '';
+      mState.doctorTarget = '';
+    } else {
+      eventText = `☀️ بدأ النهار - الجولة ${mState.round + 1}`;
+    }
+    updates.round = (mState.round || 1) + 1;
+  } else if (current === 'day') {
+    eventText = '🗳️ وقت التصويت! من تشك فيه؟';
+  } else {
+    eventText = `🌙 بدأ الليل - المافيا تتحرك`;
+  }
+
+  const newEvents = [{ text: eventText, time: now(), isNew: true }, ...mState.events].slice(0, 5);
+  updates.events = newEvents;
+
+  if (demoMode) {
+    mState.phase = next;
+    mState.events = newEvents;
+    mState.votes = {};
+    if (updates[`players/${mState.mafiaTarget}/eliminated`]) mState.players[mState.mafiaTarget].eliminated = true;
+    renderMafiaPlayers(); renderMafiaEvents(); updateMafiaPhaseUI();
+    return;
+  }
+
+  await update(ref(db, `mafia/${mState.roomCode}`), updates);
+};
+
+window.voteMafia = async function(targetId) {
+  if (mState.phase !== 'vote') return;
+  const me = mState.players[mState.playerId];
+  if (!me || me.eliminated) return;
+
+  mState.votes[mState.playerId] = targetId;
+  addMafiaEvent(`🗳️ ${me.name} صوّت`);
+
+  if (!demoMode) {
+    await update(ref(db, `mafia/${mState.roomCode}/votes`), { [mState.playerId]: targetId });
+    await update(ref(db, `mafia/${mState.roomCode}/events`), Object.fromEntries(mState.events.map((e,i)=>[i,e])));
+  }
+  renderMafiaPlayers();
+};
+
+function showMafiaGameover(winner) {
+  const overlay = document.getElementById('mafia-gameover');
+  overlay.style.display = 'flex';
+  if (winner === 'mafia') {
+    document.getElementById('m-go-emoji').textContent = '🔫';
+    document.getElementById('m-go-title').textContent = 'فازت المافيا!';
+    document.getElementById('m-go-desc').textContent = 'المافيا سيطرت على المدينة...';
+  } else {
+    document.getElementById('m-go-emoji').textContent = '🏆';
+    document.getElementById('m-go-title').textContent = 'فاز المواطنون!';
+    document.getElementById('m-go-desc').textContent = 'تم القضاء على المافيا!';
+  }
+}
+
+window.closeMafiaGameover = function() {
+  document.getElementById('mafia-gameover').style.display = 'none';
+  newMafiaRound();
+};
+
+window.newMafiaRound = async function() {
+  if (!mState.isAdmin) return;
+  const players = Object.values(mState.players).map(p => ({...p, eliminated: false, role: ''}));
+  const updatedPlayers = {};
+  players.forEach(p => { updatedPlayers[p.id] = p; });
+  const updates = { phase: 'waiting', players: updatedPlayers, votes: {}, events: [], round: 1, roleReveal: null };
+  if (demoMode) {
+    mState.phase = 'waiting'; mState.votes = {}; mState.events = []; mState.roleShown = false;
+    updateMafiaWaiting();
+    return;
+  }
+  await update(ref(db, `mafia/${mState.roomCode}`), updates);
+};
+
+// =====================================================================
+// ==================== UNDERCOVER GAME ====================
+// =====================================================================
+let ucState = {
+  roomCode: '', playerId: '', playerName: '', isAdmin: false,
+  phase: 'waiting', players: {}, events: [],
+  myWord: '', isSpy: false, votes: {}, round: 1,
+  wordRevealed: false
+};
+
+const UC_CATEGORIES = {
+  '🍕 طعام': [['بيتزا','لازانيا'],['قهوة','شاي'],['برغر','هوت دوغ'],['تفاح','كمثرى']],
+  '⚽ رياضة': [['كرة قدم','رغبي'],['سباحة','غوص'],['تنس','تنس طاولة'],['بوكس','مصارعة']],
+  '🌍 أماكن': [['شاطئ','بحيرة'],['مطار','محطة قطار'],['متحف','معرض فنون'],['مدرسة','جامعة']],
+  '🎬 ترفيه': [['سينما','مسرح'],['مسلسل','فيلم'],['ألعاب فيديو','ألعاب لوحية'],['موسيقى','بودكاست']],
+  '🐾 حيوانات': [['قطة','نمر'],['كلب','ذئب'],['دجاجة','بطة'],['قرش','دولفين']],
+};
+
+let selectedCategories = [];
+
+function renderUCCategories() {
+  const el = document.getElementById('uc-categories');
+  if (!el) return;
+  el.innerHTML = Object.keys(UC_CATEGORIES).map(cat =>
+    `<span class="cat-tag" onclick="toggleCategory('${cat}')" id="cat-${CSS.escape(cat)}">${cat}</span>`
+  ).join('');
+}
+
+window.toggleCategory = function(cat) {
+  const idx = selectedCategories.indexOf(cat);
+  if (idx > -1) selectedCategories.splice(idx, 1);
+  else selectedCategories.push(cat);
+  document.querySelectorAll('.cat-tag').forEach(el => {
+    el.classList.toggle('selected', selectedCategories.includes(el.textContent));
+  });
+};
+
+function pickUCWords() {
+  // Use lobby settings if available
+  if (ucLobbySettings && ucLobbySettings.customWord1 && ucLobbySettings.customWord2) {
+    return [ucLobbySettings.customWord1, ucLobbySettings.customWord2];
+  }
+  const cats = (ucLobbySettings && ucLobbySettings.categories && ucLobbySettings.categories.length > 0)
+    ? ucLobbySettings.categories : Object.keys(UC_CATEGORIES);
+  const randomCat = cats[Math.floor(Math.random() * cats.length)];
+  const pairs = UC_CATEGORIES[randomCat] || UC_CATEGORIES['🍕 طعام'];
+  return pairs[Math.floor(Math.random() * pairs.length)];
+}
+
+function addUCEvent(text, isNew=true) {
+  const MAX = 5;
+  ucState.events.unshift({ text, time: now(), isNew });
+  if (ucState.events.length > MAX) ucState.events = ucState.events.slice(0, MAX);
+  renderUCEvents();
+}
+
+function renderUCEvents() {
+  const grid = document.getElementById('uc-events-grid');
+  if (!grid) return;
+  if (ucState.events.length === 0) {
+    grid.innerHTML = '<div class="uc-event-item" style="color:#555;justify-content:center">لا أحداث...</div>';
+    return;
+  }
+  grid.innerHTML = ucState.events.map((e,i) =>
+    `<div class="uc-event-item ${i===0 && e.isNew ? 'new' : ''}">
+      <span class="event-time">${e.time}</span>
+      <span>${e.text}</span>
+    </div>`
+  ).join('');
+}
+
+function renderUCPlayers() {
+  const list = document.getElementById('uc-players-list');
+  if (!list) return;
+  const isVote = ucState.phase === 'vote';
+  const title = document.getElementById('uc-players-title');
+  if (title) title.textContent = isVote ? '🗳️ صوّت لإقصاء المتسلل' : '👥 اللاعبون';
+
+  const players = Object.values(ucState.players || {});
+  list.innerHTML = players.map(p => {
+    const eliminated = p.eliminated;
+    const myVote = ucState.votes[ucState.playerId] === p.id;
+    const voteCount = Object.values(ucState.votes || {}).filter(v => v === p.id).length;
+
+    return `<div class="undercover-player-item ${eliminated ? 'eliminated' : ''} ${myVote ? 'voted' : ''}">
+      <div style="display:flex;align-items:center;gap:0.5rem">
+        <span style="font-weight:700;color:var(--undercover-text)">${p.name}${p.id === ucState.playerId ? ' (أنت)' : ''}</span>
+        ${eliminated ? '<span class="tag" style="background:#1c2128;color:#8b949e;font-size:0.7rem">مقصى</span>' : ''}
+        ${voteCount > 0 ? `<span style="color:#f85149;font-size:0.75rem">🗳️${voteCount}</span>` : ''}
+      </div>
+      ${isVote && !eliminated && p.id !== ucState.playerId ?
+        `<button class="uc-vote-btn ${myVote ? 'voted' : ''}" onclick="voteUC('${p.id}')">
+          ${myVote ? '✅' : '🗳️ صوّت'}
+        </button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+window.joinUCRoom = async function() {
+  const name = document.getElementById('uc-player-name').value.trim();
+  const codeInput = document.getElementById('uc-room-code-input').value.trim().toUpperCase();
+  if (!name) return showToast('⚠️ أدخل اسمك');
+
+  const isNew = !codeInput;
+  const code = isNew ? randCode() : codeInput;
+  ucState.roomCode = code;
+  ucState.playerName = name;
+  ucState.isAdmin = isNew;
+  ucState.playerId = name + '_' + Date.now();
+
+  if (demoMode) {
+    ucState.players = {};
+    ucState.players[ucState.playerId] = { id: ucState.playerId, name, isAdmin: isNew, eliminated: false };
+    document.getElementById('uc-room-display').textContent = code;
+    if (isNew) { showUCView('waiting'); } else { showUCView('waiting-player'); }
+    updateUCWaiting();
+    renderUCCategories();
+    return;
+  }
+
+  const roomRef = ref(db, `undercover/${code}`);
+  if (isNew) {
+    await set(roomRef, {
+      phase: 'waiting',
+      adminId: ucState.playerId,
+      round: 1,
+      players: { [ucState.playerId]: { id: ucState.playerId, name, isAdmin: true, eliminated: false } },
+      events: [], votes: {}
+    });
+    document.getElementById('uc-room-display').textContent = code;
+  } else {
+    const snap = await get(roomRef);
+    if (!snap.exists()) return showToast('❌ الغرفة غير موجودة');
+    await update(ref(db, `undercover/${code}/players`), {
+      [ucState.playerId]: { id: ucState.playerId, name, isAdmin: false, eliminated: false }
+    });
+  }
+
+  listenUCRoom();
+  if (isNew) { showUCView('waiting'); renderUCCategories(); }
+  else showUCView('waiting-player');
+};
+
+function listenUCRoom() {
+  const roomRef = ref(db, `undercover/${ucState.roomCode}`);
+  onValue(roomRef, snap => {
+    if (!snap.exists()) return;
+    const data = snap.val();
+    ucState.players = data.players || {};
+    ucState.phase = data.phase || 'waiting';
+    ucState.events = data.events ? (Array.isArray(data.events) ? data.events : Object.values(data.events)).slice(0,5) : [];
+    ucState.votes = data.votes || {};
+    ucState.round = data.round || 1;
+
+    if (data.phase === 'waiting') {
+      updateUCWaiting();
+    } else if (data.phase === 'reveal') {
+      // Each player sees their own word
+      const myData = data.wordReveal?.[ucState.playerId];
+      if (myData && !ucState.wordRevealed) {
+        ucState.myWord = myData.word;
+        ucState.isSpy = myData.isSpy;
+        ucState.wordRevealed = true;
+        showUCWordReveal();
+      } else if (!myData) {
+        showUCView('game');
+      }
+    } else {
+      showUCView('game');
+      renderUCPlayers();
+      renderUCEvents();
+      const badge = document.getElementById('uc-round-badge');
+      if (badge) badge.textContent = `جولة ${ucState.round}`;
+      const adminCtrl = document.getElementById('uc-admin-controls');
+      if (adminCtrl) adminCtrl.style.display = ucState.isAdmin ? 'block' : 'none';
+    }
+  });
+}
+
+function updateUCWaiting() {
+  const players = Object.values(ucState.players || {});
+  const count = players.length;
+  const el = document.getElementById('uc-player-count');
+  if (el) el.textContent = count;
+
+  const waiting = document.getElementById('uc-waiting-players');
+  if (waiting) {
+    waiting.innerHTML = players.map(p =>
+      `<div class="waiting-player-chip"><span class="status-dot" style="background:#58a6ff"></span>${p.name}${p.isAdmin ? ' 👑' : ''}</div>`
+    ).join('');
+  }
+
+  const waitingView = document.getElementById('uc-waiting-players-view');
+  if (waitingView) {
+    waitingView.innerHTML = players.map(p =>
+      `<div class="waiting-player-chip" style="background:#161b22;border-color:#30363d"><span class="status-dot" style="background:#58a6ff"></span>${p.name}</div>`
+    ).join('');
+  }
+
+  const startBtn = document.getElementById('uc-start-btn');
+  if (startBtn) startBtn.disabled = count < 3;
+
+  if (ucState.isAdmin) showUCView('waiting');
+  else showUCView('waiting-player');
+}
+
+window.startUCGame = async function() {
+  const players = Object.values(ucState.players || {});
+  if (players.length < 3) return showToast('⚠️ تحتاج على الأقل 3 لاعبين');
+
+  const [word, spyWord] = pickUCWords();
+  const spyId = players[Math.floor(Math.random() * players.length)].id;
+
+  const wordReveal = {};
+  players.forEach(p => {
+    wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
+  });
+
+  const updates = {
+    phase: 'reveal',
+    round: (ucState.round || 0) + 1,
+    spyId,
+    word, spyWord,
+    wordReveal,
+    votes: {},
+    events: [{ text: '🎮 بدأت اللعبة! شاهد كلمتك...', time: now(), isNew: true }]
+  };
+
+  ucState.wordRevealed = false;
+
+  if (demoMode) {
+    ucState.phase = 'reveal';
+    ucState.round = updates.round;
+    const myData = wordReveal[ucState.playerId];
+    ucState.myWord = myData.word;
+    ucState.isSpy = myData.isSpy;
+    ucState.wordRevealed = true;
+    ucState.events = updates.events;
+    showUCWordReveal();
+    return;
+  }
+
+  await update(ref(db, `undercover/${ucState.roomCode}`), updates);
+};
+
+function showUCWordReveal() {
+  const card = document.getElementById('uc-word-card');
+  const wordEl = document.getElementById('uc-word-display');
+  const label = document.getElementById('uc-word-label');
+  const hint = document.getElementById('uc-role-hint');
+  const nameEl = document.getElementById('uc-reveal-name');
+
+  if (nameEl) nameEl.textContent = ucState.playerName;
+  if (wordEl) wordEl.textContent = ucState.myWord;
+
+  if (ucState.isSpy) {
+    if (card) card.className = 'word-card spy';
+    if (wordEl) wordEl.className = 'word-reveal spy-word';
+    if (label) label.textContent = 'أنت المتسلل! كلمتك:';
+    if (hint) hint.textContent = '⚠️ أنت المتسلل! حاول اكتشاف الكلمة الحقيقية من ردود الآخرين دون أن تُكشف';
+  } else {
+    if (card) card.className = 'word-card';
+    if (wordEl) wordEl.className = 'word-reveal';
+    if (label) label.textContent = 'الكلمة السرية:';
+    if (hint) hint.textContent = '💡 صف الكلمة بجملة واحدة دون ذكرها — ساعد في كشف المتسلل!';
+  }
+
+  showUCView('word-reveal');
+}
+
+window.doneReveal = async function() {
+  // Remove this player from reveal list
+  if (!demoMode) {
+    await update(ref(db, `undercover/${ucState.roomCode}/wordReveal/${ucState.playerId}/seen`), true);
+  }
+  showUCView('game');
+  renderUCPlayers();
+  renderUCEvents();
+  const adminCtrl = document.getElementById('uc-admin-controls');
+  if (adminCtrl) adminCtrl.style.display = ucState.isAdmin ? 'block' : 'none';
+  // Transition to 'playing' phase
+  if (ucState.isAdmin && !demoMode) {
+    await update(ref(db, `undercover/${ucState.roomCode}`), { phase: 'playing' });
+  } else if (demoMode) {
+    ucState.phase = 'playing';
+  }
+};
+
+function showUCView(view) {
+  ['uc-join','uc-waiting','uc-waiting-player','uc-word-reveal','uc-game'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  const el = document.getElementById(`uc-${view}`);
+  if (el) el.style.display = 'block';
+  if (view === 'join') document.getElementById('uc-join').style.display = 'block';
+}
+
+window.advanceUCPhase = async function() {
+  const phases = ['playing', 'vote', 'playing'];
+  const current = ucState.phase;
+
+  let next, eventText, updates = {};
+
+  if (current === 'playing') {
+    next = 'vote';
+    eventText = '🗳️ وقت التصويت! من هو المتسلل؟';
+  } else if (current === 'vote') {
+    // Process votes
+    const voteCounts = {};
+    Object.values(ucState.votes || {}).forEach(v => { voteCounts[v] = (voteCounts[v] || 0) + 1; });
+    const sorted = Object.entries(voteCounts).sort((a,b) => b[1]-a[1]);
+
+    if (sorted.length > 0) {
+      const [topId] = sorted[0];
+      const topPlayer = ucState.players[topId];
+      if (topPlayer) {
+        updates[`players/${topId}/eliminated`] = true;
+        if (topPlayer.isSpy || (ucState.spyId && topId === ucState.spyId)) {
+          eventText = `🎯 تم إقصاء المتسلل ${topPlayer.name}! فاز الفريق!`;
+          next = 'playing';
+          setTimeout(() => showUCGameover(true, topPlayer.name), 500);
+        } else {
+          eventText = `❌ تم إقصاء ${topPlayer.name} — لم يكن المتسلل!`;
+          next = 'playing';
+          // Check if spy wins
+          const alivePlayers = Object.values(ucState.players).filter(p => !p.eliminated && p.id !== topId);
+          if (alivePlayers.length <= 2) {
+            setTimeout(() => showUCGameover(false, ''), 500);
+          }
+        }
+      }
+    } else {
+      eventText = '🗳️ لا أحد حصل على أصوات — تستمر اللعبة';
+      next = 'playing';
+    }
+    updates.votes = {};
+  } else {
+    next = 'playing';
+    eventText = `💬 جولة نقاش جديدة`;
+  }
+
+  const newEvents = [{ text: eventText, time: now(), isNew: true }, ...ucState.events].slice(0,5);
+  updates.phase = next;
+  updates.events = newEvents;
+
+  if (demoMode) {
+    ucState.phase = next;
+    ucState.events = newEvents;
+    ucState.votes = {};
+    renderUCPlayers(); renderUCEvents();
+    return;
+  }
+
+  await update(ref(db, `undercover/${ucState.roomCode}`), updates);
+};
+
+window.voteUC = async function(targetId) {
+  if (ucState.phase !== 'vote') return;
+  const me = ucState.players[ucState.playerId];
+  if (!me || me.eliminated) return;
+
+  ucState.votes[ucState.playerId] = targetId;
+  addUCEvent(`🗳️ ${me.name} صوّت`);
+
+  if (!demoMode) {
+    await update(ref(db, `undercover/${ucState.roomCode}/votes`), { [ucState.playerId]: targetId });
+    await update(ref(db, `undercover/${ucState.roomCode}/events`), Object.fromEntries(ucState.events.map((e,i)=>[i,e])));
+  }
+  renderUCPlayers();
+};
+
+function showUCGameover(spyCaught, spyName) {
+  const overlay = document.getElementById('uc-gameover');
+  overlay.style.display = 'flex';
+  if (spyCaught) {
+    document.getElementById('uc-go-emoji').textContent = '🎯';
+    document.getElementById('uc-go-title').textContent = 'تم كشف المتسلل!';
+    document.getElementById('uc-go-desc').textContent = `أُقصي ${spyName} — فاز الفريق 🎉`;
+  } else {
+    document.getElementById('uc-go-emoji').textContent = '🕵️';
+    document.getElementById('uc-go-title').textContent = 'فاز المتسلل!';
+    document.getElementById('uc-go-desc').textContent = `نجح المتسلل في البقاء مجهولًا...`;
+  }
+}
+
+window.closeUCGameover = function() {
+  document.getElementById('uc-gameover').style.display = 'none';
+  newUCRound();
+};
+
+window.newUCRound = async function() {
+  if (!ucState.isAdmin) return;
+  ucState.wordRevealed = false;
+  const updates = { phase: 'waiting', votes: {}, events: [], wordReveal: null };
+  if (demoMode) { ucState.phase = 'waiting'; ucState.votes = {}; ucState.events = []; updateUCWaiting(); return; }
+  await update(ref(db, `undercover/${ucState.roomCode}`), updates);
+};
+
+// Init
+renderUCCategories();
+</script>
+</body>
+</html>
