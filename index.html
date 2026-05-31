@@ -681,23 +681,158 @@
 <!-- HOME SCREEN -->
 <div id="home-screen">
   <div class="home-title">🎮 ألعاب الأصدقاء</div>
-  <div class="home-subtitle">اختر اللعبة اللي تبغي تلعبها</div>
-  <div class="game-cards">
-    <div class="game-card mafia-card" onclick="goToGame('mafia')">
-      <div class="card-emoji">🔫</div>
-      <div class="card-title">المافيا</div>
-      <div class="card-desc">اكتشف من هو المافيا قبل ما يقضو عليكم</div>
+  <div class="home-subtitle">أنشئ غرفة أو انضم لغرفة موجودة</div>
+
+  <!-- Create Room -->
+  <div style="width:100%;max-width:380px;margin-bottom:1.5rem">
+    <div class="card" style="background:#13131a;border-color:#2a2a3a">
+      <h2 style="font-size:1rem;margin-bottom:1rem;color:#ffd60a">🆕 إنشاء غرفة جديدة</h2>
+      <div class="input-group">
+        <label>اسمك (المدير)</label>
+        <input id="home-create-name" placeholder="أدخل اسمك..." maxlength="15">
+      </div>
+      <button class="big-btn red" onclick="createRoom()" style="margin-bottom:0">🚪 إنشاء غرفة</button>
     </div>
-    <div class="game-card undercover-card" onclick="goToGame('undercover')">
-      <div class="card-emoji">🕵️</div>
-      <div class="card-title">المتسلل</div>
-      <div class="card-desc">كشف المتسلل قبل ما يكشف كلمتكم</div>
+  </div>
+
+  <div style="color:#444;font-size:0.85rem;margin-bottom:1.5rem">— أو —</div>
+
+  <!-- Join Room -->
+  <div style="width:100%;max-width:380px">
+    <div class="card" style="background:#13131a;border-color:#2a2a3a">
+      <h2 style="font-size:1rem;margin-bottom:1rem;color:#58a6ff">🔗 الانضمام لغرفة</h2>
+      <div class="input-group">
+        <label>اسمك</label>
+        <input id="home-join-name" placeholder="أدخل اسمك..." maxlength="15">
+      </div>
+      <div class="input-group">
+        <label>كود الغرفة</label>
+        <input id="home-join-code" placeholder="XXXX" maxlength="6" style="text-transform:uppercase;letter-spacing:0.2em">
+      </div>
+      <button class="big-btn blue" onclick="joinRoom()" style="margin-bottom:0">🚀 انضم</button>
     </div>
   </div>
 </div>
 
+<!-- LOBBY SCREEN (after creating room, before game starts) -->
+<div id="lobby-screen" style="display:none;min-height:100vh;padding:1rem">
+  <div class="mafia-header" style="background:linear-gradient(135deg,#1a1a2e,#0a0a0f);border-bottom:1px solid #2a2a3a">
+    <div style="font-size:1.3rem;font-weight:900;color:#ffd60a">🎮 الغرفة</div>
+    <div style="display:flex;align-items:center;gap:0.5rem"><span class="status-dot"></span><span style="font-size:0.8rem;color:#aaa">انتظار اللاعبين</span></div>
+  </div>
+  <div style="max-width:500px;margin:0 auto;padding-top:0.5rem">
+
+    <!-- Room Code -->
+    <div class="card" style="text-align:center">
+      <div style="font-size:0.85rem;color:#aaa;margin-bottom:0.3rem">كود الغرفة — شاركه مع أصدقائك</div>
+      <div class="room-code" id="lobby-room-code">----</div>
+      <button class="btn btn-outline btn-sm" onclick="copyLobbyCode()" style="margin-top:0.75rem;width:auto;padding:0.4rem 1rem">📋 نسخ الكود</button>
+    </div>
+
+    <!-- Players -->
+    <div class="card">
+      <h2>👥 اللاعبون (<span id="lobby-player-count">0</span>)</h2>
+      <div class="waiting-players" id="lobby-players-list" style="margin-top:0.5rem"></div>
+    </div>
+
+    <!-- Game Selection (Admin only) -->
+    <div class="card" id="lobby-game-select">
+      <h2 style="margin-bottom:1rem">🎯 اختر اللعبة</h2>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap">
+        <div class="game-card mafia-card" onclick="selectLobbyGame('mafia')" id="lobby-mafia-card" style="flex:1;min-width:120px;padding:1rem">
+          <div class="card-emoji" style="font-size:2rem">🔫</div>
+          <div class="card-title" style="font-size:1rem">المافيا</div>
+          <div class="card-desc" style="font-size:0.75rem">تحتاج 4+ لاعبين</div>
+        </div>
+        <div class="game-card undercover-card" onclick="selectLobbyGame('undercover')" id="lobby-uc-card" style="flex:1;min-width:120px;padding:1rem">
+          <div class="card-emoji" style="font-size:2rem">🕵️</div>
+          <div class="card-title" style="font-size:1rem">المتسلل</div>
+          <div class="card-desc" style="font-size:0.75rem">تحتاج 3+ لاعبين</div>
+        </div>
+      </div>
+
+      <!-- Mafia settings (when selected) -->
+      <div id="lobby-mafia-settings" style="display:none;margin-top:1rem">
+        <div class="settings-row">
+          <div><div class="settings-label">عدد المافيا</div></div>
+          <select id="lobby-mafia-count" style="width:80px">
+            <option value="auto">تلقائي</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-label">المحقق</div></div>
+          <div class="toggle" id="lobby-toggle-detective" onclick="toggleSetting(this)"></div>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-label">الطبيب</div></div>
+          <div class="toggle" id="lobby-toggle-doctor" onclick="toggleSetting(this)"></div>
+        </div>
+      </div>
+
+      <!-- Undercover settings (when selected) -->
+      <div id="lobby-uc-settings" style="display:none;margin-top:1rem">
+        <div style="font-size:0.85rem;color:#8b949e;margin-bottom:0.5rem">المجالات:</div>
+        <div id="lobby-uc-categories"></div>
+        <div style="margin-top:0.75rem">
+          <label style="font-size:0.82rem;color:#8b949e;display:block;margin-bottom:0.4rem">أو أدخل كلمتين يدويًا:</label>
+          <div class="grid-2">
+            <input id="lobby-custom-word1" placeholder="الكلمة العامة" style="background:#0d0d14;border-color:#2a2a3a;color:#f1f1f1">
+            <input id="lobby-custom-word2" placeholder="كلمة المتسلل" style="background:#0d0d14;border-color:#2a2a3a;color:#f1f1f1">
+          </div>
+        </div>
+      </div>
+
+      <button class="big-btn red" id="lobby-start-btn" onclick="startLobbyGame()" style="margin-top:1.25rem;display:none" disabled>▶️ ابدأ اللعبة</button>
+    </div>
+
+    <!-- Rename (admin) -->
+    <div class="card">
+      <h2 style="font-size:0.95rem;margin-bottom:0.75rem">✏️ تغيير اسمك</h2>
+      <div style="display:flex;gap:0.5rem">
+        <input id="lobby-rename-admin-input" placeholder="الاسم الجديد..." maxlength="15" style="flex:1">
+        <button class="btn btn-gold btn-sm" onclick="renameLobbyPlayer('admin')" style="width:auto;margin-top:0;padding:0.6rem 1rem">تغيير</button>
+      </div>
+    </div>
+
+    <button class="btn btn-outline" onclick="leaveLobby()" style="margin-top:0.5rem">← الخروج</button>
+  </div>
+</div>
+
+<!-- LOBBY WAITING (non-admin) -->
+<div id="lobby-waiting-screen" style="display:none;min-height:100vh;padding:1rem">
+  <div class="mafia-header" style="background:linear-gradient(135deg,#1a1a2e,#0a0a0f);border-bottom:1px solid #2a2a3a">
+    <div style="font-size:1.3rem;font-weight:900;color:#ffd60a">🎮 الغرفة</div>
+  </div>
+  <div style="max-width:500px;margin:0 auto;padding-top:0.5rem">
+    <div class="card" style="text-align:center;padding:2rem 1rem">
+      <div style="font-size:3rem;margin-bottom:1rem">⏳</div>
+      <div style="font-size:1.1rem;font-weight:700;margin-bottom:0.3rem">في انتظار المدير</div>
+      <div style="font-size:0.85rem;color:#aaa;margin-bottom:1.5rem">سيختار المدير اللعبة ويبدأها قريبًا...</div>
+      <div style="font-size:0.85rem;color:#aaa;margin-bottom:0.5rem">كود الغرفة:</div>
+      <div class="room-code" id="lobby-wait-code" style="font-size:1.8rem;margin:0 auto;max-width:200px">----</div>
+      <div style="margin-top:1.5rem">
+        <div style="font-size:0.85rem;color:#aaa;margin-bottom:0.5rem">اللاعبون:</div>
+        <div class="waiting-players" id="lobby-wait-players" style="justify-content:center"></div>
+      </div>
+    </div>
+
+    <!-- Rename -->
+    <div class="card">
+      <h2 style="font-size:0.95rem;margin-bottom:0.75rem">✏️ تغيير اسمك</h2>
+      <div style="display:flex;gap:0.5rem">
+        <input id="lobby-rename-input" placeholder="الاسم الجديد..." maxlength="15" style="flex:1">
+        <button class="btn btn-gold btn-sm" onclick="renameLobbyPlayer()" style="width:auto;margin-top:0;padding:0.6rem 1rem">تغيير</button>
+      </div>
+    </div>
+
+    <button class="btn btn-outline" onclick="leaveLobby()" style="margin-top:0.5rem">← الخروج</button>
+  </div>
+</div>
+
 <!-- SWITCH BUTTON -->
-<button class="switch-btn" id="switch-btn" onclick="showHome()">🏠 الرئيسية</button>
+<button class="switch-btn" id="switch-btn" onclick="returnToLobby()">🏠 الرئيسية</button>
 
 <!-- ==================== MAFIA GAME ==================== -->
 <div id="mafia-screen" class="screen">
@@ -808,6 +943,7 @@
           <button class="btn btn-gold" onclick="advanceMafiaPhase()">⏭️ المرحلة التالية</button>
           <button class="btn btn-outline" onclick="newMafiaRound()">🔄 جولة جديدة</button>
         </div>
+        <button class="btn btn-outline" onclick="switchGame()" style="margin-top:0.5rem;border-color:#58a6ff;color:#58a6ff">🔀 تغيير اللعبة</button>
         <div id="m-admin-night-actions" style="display:none;margin-top:1rem">
           <div class="night-panel">
             <div style="font-size:0.85rem;color:#7c9aed;margin-bottom:0.75rem">🌙 أعمال الليل</div>
@@ -827,6 +963,15 @@
 
       <!-- BACK TO HOME -->
       <button class="btn btn-outline" onclick="showHome()" style="margin-top:0.5rem">🏠 العودة للرئيسية</button>
+
+      <!-- RENAME -->
+      <div class="card" style="margin-top:0.5rem">
+        <h2 style="font-size:0.9rem;margin-bottom:0.6rem">✏️ تغيير اسمك</h2>
+        <div style="display:flex;gap:0.5rem">
+          <input id="mafia-rename-input" placeholder="الاسم الجديد..." maxlength="15" style="flex:1">
+          <button class="btn btn-gold btn-sm" onclick="renameInGame('mafia')" style="width:auto;margin-top:0;padding:0.6rem 1rem">تغيير</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -970,9 +1115,19 @@
           <button class="btn btn-blue" onclick="advanceUCPhase()">⏭️ التالي</button>
           <button class="btn btn-outline" onclick="newUCRound()" style="border-color:#30363d;color:#8b949e">🔄 جولة جديدة</button>
         </div>
+        <button class="btn btn-outline" onclick="switchGame()" style="margin-top:0.5rem;border-color:#e63946;color:#e63946">🔀 تغيير اللعبة</button>
       </div>
 
       <button class="btn btn-outline" onclick="showHome()" style="margin-top:0.5rem;border-color:#30363d;color:#8b949e">🏠 الرئيسية</button>
+
+      <!-- RENAME -->
+      <div class="card" style="background:#161b22;border-color:#30363d;margin-top:0.5rem">
+        <h2 style="font-size:0.9rem;margin-bottom:0.6rem;color:#e6edf3">✏️ تغيير اسمك</h2>
+        <div style="display:flex;gap:0.5rem">
+          <input id="undercover-rename-input" placeholder="الاسم الجديد..." maxlength="15" style="flex:1;background:#0d1117;border-color:#30363d;color:#e6edf3">
+          <button class="btn btn-blue btn-sm" onclick="renameInGame('undercover')" style="width:auto;margin-top:0;padding:0.6rem 1rem">تغيير</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1053,27 +1208,433 @@ window.toggleSetting = function(el) { el.classList.toggle('on'); };
 // =====================================================================
 // NAVIGATION
 // =====================================================================
-window.goToGame = function(game) {
+// =====================================================================
+// LOBBY STATE
+// =====================================================================
+let lobbyState = {
+  roomCode: '', playerId: '', playerName: '', isAdmin: false,
+  players: {}, selectedGame: null
+};
+let lobbySelectedCategories = [];
+
+// =====================================================================
+// NAVIGATION
+// =====================================================================
+window.showHome = function() {
+  document.getElementById('home-screen').style.display = 'flex';
+  document.getElementById('lobby-screen').style.display = 'none';
+  document.getElementById('lobby-waiting-screen').style.display = 'none';
+  document.getElementById('mafia-screen').classList.remove('active');
+  document.getElementById('undercover-screen').classList.remove('active');
+  document.getElementById('switch-btn').style.display = 'none';
+  document.body.classList.remove('undercover-theme');
+};
+
+window.leaveLobby = function() {
+  showHome();
+};
+
+window.copyLobbyCode = function() {
+  navigator.clipboard.writeText(lobbyState.roomCode).then(() => showToast('✅ تم نسخ الكود!'));
+};
+
+// =====================================================================
+// CREATE / JOIN ROOM
+// =====================================================================
+window.createRoom = async function() {
+  const name = document.getElementById('home-create-name').value.trim();
+  if (!name) return showToast('⚠️ أدخل اسمك');
+
+  const code = randCode();
+  lobbyState.roomCode = code;
+  lobbyState.playerName = name;
+  lobbyState.isAdmin = true;
+  lobbyState.playerId = name + '_' + Date.now();
+  lobbyState.players = {};
+  lobbyState.players[lobbyState.playerId] = { id: lobbyState.playerId, name, isAdmin: true };
+
+  if (!demoMode) {
+    await set(ref(db, `lobby/${code}`), {
+      adminId: lobbyState.playerId,
+      players: lobbyState.players,
+      game: null, started: false
+    });
+  }
+
+  document.getElementById('lobby-room-code').textContent = code;
   document.getElementById('home-screen').style.display = 'none';
-  document.getElementById('switch-btn').style.display = 'flex';
-  if (game === 'mafia') {
-    document.body.classList.remove('undercover-theme');
-    document.getElementById('mafia-screen').classList.add('active');
-    document.getElementById('undercover-screen').classList.remove('active');
+  document.getElementById('lobby-screen').style.display = 'block';
+  renderLobbyCategories();
+  updateLobbyPlayers();
+
+  if (!demoMode) listenLobby();
+};
+
+window.joinRoom = async function() {
+  const name = document.getElementById('home-join-name').value.trim();
+  const code = document.getElementById('home-join-code').value.trim().toUpperCase();
+  if (!name) return showToast('⚠️ أدخل اسمك');
+  if (!code) return showToast('⚠️ أدخل كود الغرفة');
+
+  lobbyState.roomCode = code;
+  lobbyState.playerName = name;
+  lobbyState.isAdmin = false;
+  lobbyState.playerId = name + '_' + Date.now();
+
+  if (demoMode) {
+    showToast('⚠️ وضع التجربة: Firebase مطلوب للانضمام من جهاز آخر');
+    lobbyState.players = {};
+    lobbyState.players[lobbyState.playerId] = { id: lobbyState.playerId, name, isAdmin: false };
+    document.getElementById('lobby-wait-code').textContent = code;
+    document.getElementById('home-screen').style.display = 'none';
+    document.getElementById('lobby-waiting-screen').style.display = 'block';
+    updateLobbyWaitingPlayers();
+    return;
+  }
+
+  const snap = await get(ref(db, `lobby/${code}`));
+  if (!snap.exists()) return showToast('❌ الغرفة غير موجودة');
+  const data = snap.val();
+  if (data.started) return showToast('❌ اللعبة بدأت بالفعل');
+
+  await update(ref(db, `lobby/${code}/players`), {
+    [lobbyState.playerId]: { id: lobbyState.playerId, name, isAdmin: false }
+  });
+
+  document.getElementById('lobby-wait-code').textContent = code;
+  document.getElementById('home-screen').style.display = 'none';
+  document.getElementById('lobby-waiting-screen').style.display = 'block';
+  listenLobby();
+};
+
+// =====================================================================
+// LOBBY LISTEN
+// =====================================================================
+function listenLobby() {
+  onValue(ref(db, `lobby/${lobbyState.roomCode}`), snap => {
+    if (!snap.exists()) return;
+    const data = snap.val();
+    lobbyState.players = data.players || {};
+
+    updateLobbyPlayers();
+    updateLobbyWaitingPlayers();
+
+    // If game started, switch to that game
+    if (data.started && data.game) {
+      startGameFromLobby(data.game, data.gameSettings || {});
+    }
+  });
+}
+
+function updateLobbyPlayers() {
+  const players = Object.values(lobbyState.players || {});
+  const el = document.getElementById('lobby-player-count');
+  if (el) el.textContent = players.length;
+  const list = document.getElementById('lobby-players-list');
+  if (list) {
+    list.innerHTML = players.map(p =>
+      `<div class="waiting-player-chip"><span class="status-dot"></span>${p.name}${p.isAdmin ? ' 👑' : ''}</div>`
+    ).join('');
+  }
+  updateLobbyStartBtn();
+}
+
+function updateLobbyWaitingPlayers() {
+  const players = Object.values(lobbyState.players || {});
+  const list = document.getElementById('lobby-wait-players');
+  if (list) {
+    list.innerHTML = players.map(p =>
+      `<div class="waiting-player-chip"><span class="status-dot"></span>${p.name}${p.isAdmin ? ' 👑' : ''}</div>`
+    ).join('');
+  }
+}
+
+function updateLobbyStartBtn() {
+  const btn = document.getElementById('lobby-start-btn');
+  if (!btn || !lobbyState.isAdmin) return;
+  const count = Object.values(lobbyState.players || {}).length;
+  const game = lobbyState.selectedGame;
+  const minPlayers = game === 'mafia' ? 4 : game === 'undercover' ? 3 : 99;
+  btn.disabled = count < minPlayers || !game;
+}
+
+// =====================================================================
+// GAME SELECTION IN LOBBY
+// =====================================================================
+window.selectLobbyGame = function(game) {
+  lobbyState.selectedGame = game;
+  document.getElementById('lobby-mafia-card').style.outline = game === 'mafia' ? '3px solid #e63946' : '';
+  document.getElementById('lobby-uc-card').style.outline = game === 'undercover' ? '3px solid #58a6ff' : '';
+  document.getElementById('lobby-mafia-settings').style.display = game === 'mafia' ? 'block' : 'none';
+  document.getElementById('lobby-uc-settings').style.display = game === 'undercover' ? 'block' : 'none';
+  document.getElementById('lobby-start-btn').style.display = 'block';
+  updateLobbyStartBtn();
+};
+
+function renderLobbyCategories() {
+  const el = document.getElementById('lobby-uc-categories');
+  if (!el) return;
+  el.innerHTML = Object.keys(UC_CATEGORIES).map(cat =>
+    `<span class="cat-tag" onclick="toggleLobbyCategory('${cat}')" id="lcat-${CSS.escape(cat)}">${cat}</span>`
+  ).join('');
+}
+
+window.toggleLobbyCategory = function(cat) {
+  const idx = lobbySelectedCategories.indexOf(cat);
+  if (idx > -1) lobbySelectedCategories.splice(idx, 1);
+  else lobbySelectedCategories.push(cat);
+  document.querySelectorAll('.cat-tag').forEach(el => {
+    if (el.id && el.id.startsWith('lcat-')) {
+      el.classList.toggle('selected', lobbySelectedCategories.includes(el.textContent));
+    }
+  });
+};
+
+// =====================================================================
+// RENAME IN LOBBY
+// =====================================================================
+window.renameLobbyPlayer = async function(who) {
+  const inputId = who === 'admin' ? 'lobby-rename-admin-input' : 'lobby-rename-input';
+  const newName = document.getElementById(inputId)?.value.trim();
+  if (!newName) return showToast('⚠️ أدخل الاسم الجديد');
+  if (newName === lobbyState.playerName) return showToast('⚠️ نفس الاسم الحالي');
+
+  const oldName = lobbyState.playerName;
+  lobbyState.playerName = newName;
+  lobbyState.players[lobbyState.playerId].name = newName;
+
+  if (!demoMode) {
+    await update(ref(db, `lobby/${lobbyState.roomCode}/players/${lobbyState.playerId}`), { name: newName });
   } else {
-    document.body.classList.add('undercover-theme');
-    document.getElementById('undercover-screen').classList.add('active');
-    document.getElementById('mafia-screen').classList.remove('active');
+    updateLobbyPlayers();
+    updateLobbyWaitingPlayers();
+  }
+  document.getElementById(inputId).value = '';
+  showToast(`✅ ${oldName} غيّر اسمه إلى ${newName}`);
+};
+
+// =====================================================================
+// START GAME FROM LOBBY
+// =====================================================================
+window.startLobbyGame = async function() {
+  if (!lobbyState.isAdmin) return;
+  const game = lobbyState.selectedGame;
+  const players = Object.values(lobbyState.players || {});
+
+  if (!game) return showToast('⚠️ اختر اللعبة أولاً');
+  if (game === 'mafia' && players.length < 4) return showToast('⚠️ تحتاج 4+ لاعبين للمافيا');
+  if (game === 'undercover' && players.length < 3) return showToast('⚠️ تحتاج 3+ لاعبين للمتسلل');
+
+  const gameSettings = {};
+
+  if (game === 'mafia') {
+    gameSettings.mafiaCount = document.getElementById('lobby-mafia-count').value;
+    gameSettings.detective = document.getElementById('lobby-toggle-detective').classList.contains('on');
+    gameSettings.doctor = document.getElementById('lobby-toggle-doctor').classList.contains('on');
+  } else {
+    const custom1 = document.getElementById('lobby-custom-word1')?.value.trim();
+    const custom2 = document.getElementById('lobby-custom-word2')?.value.trim();
+    gameSettings.customWord1 = custom1;
+    gameSettings.customWord2 = custom2;
+    gameSettings.categories = lobbySelectedCategories;
+  }
+
+  if (!demoMode) {
+    await update(ref(db, `lobby/${lobbyState.roomCode}`), { started: true, game, gameSettings });
+  } else {
+    startGameFromLobby(game, gameSettings);
   }
 };
 
-window.showHome = function() {
-  document.getElementById('home-screen').style.display = 'flex';
-  document.getElementById('switch-btn').style.display = 'none';
+function startGameFromLobby(game, gameSettings) {
+  const players = Object.values(lobbyState.players || {});
+  document.getElementById('lobby-screen').style.display = 'none';
+  document.getElementById('lobby-waiting-screen').style.display = 'none';
+  document.getElementById('switch-btn').style.display = 'flex';
+
+  if (game === 'mafia') {
+    launchMafiaFromLobby(players, gameSettings);
+  } else if (game === 'undercover') {
+    launchUCFromLobby(players, gameSettings);
+  }
+}
+
+function launchMafiaFromLobby(players, settings) {
+  document.body.classList.remove('undercover-theme');
+  document.getElementById('mafia-screen').classList.add('active');
+  document.getElementById('undercover-screen').classList.remove('active');
+
+  // Transfer lobby state to mState
+  mState.roomCode = lobbyState.roomCode;
+  mState.playerId = lobbyState.playerId;
+  mState.playerName = lobbyState.playerName;
+  mState.isAdmin = lobbyState.isAdmin;
+  mState.players = {};
+  players.forEach(p => { mState.players[p.id] = { ...p, eliminated: false }; });
+
+  if (mState.isAdmin) {
+    // Admin directly starts the game
+    const roles = assignMafiaRoles(players, settings);
+    const updatedPlayers = {};
+    players.forEach(p => { updatedPlayers[p.id] = { ...p, role: roles[p.id], eliminated: false }; });
+    mState.players = updatedPlayers;
+    mState.phase = 'day';
+    mState.events = [{ text: '🎮 بدأت المافيا! مرحلة النهار الأولى.', time: now(), isNew: true }];
+    mState.myRole = roles[mState.playerId];
+    mState.roleShown = true;
+
+    if (!demoMode) {
+      update(ref(db, `mafia/${mState.roomCode}`), {
+        phase: 'day', round: 1, players: updatedPlayers,
+        roleReveal: roles, votes: {},
+        events: mState.events
+      });
+      listenMafiaRoom();
+    }
+
+    showMafiaView('game');
+    showRoleReveal(mState.myRole);
+    renderMafiaPlayers();
+    renderMafiaEvents();
+    updateMafiaPhaseUI();
+  } else {
+    if (!demoMode) {
+      update(ref(db, `mafia/${mState.roomCode}/players`), {
+        [mState.playerId]: { id: mState.playerId, name: mState.playerName, isAdmin: false, eliminated: false }
+      });
+      listenMafiaRoom();
+    }
+    showMafiaView('waiting-player');
+  }
+}
+
+function launchUCFromLobby(players, settings) {
+  document.body.classList.add('undercover-theme');
+  document.getElementById('undercover-screen').classList.add('active');
+  document.getElementById('mafia-screen').classList.remove('active');
+
+  ucState.roomCode = lobbyState.roomCode;
+  ucState.playerId = lobbyState.playerId;
+  ucState.playerName = lobbyState.playerName;
+  ucState.isAdmin = lobbyState.isAdmin;
+  ucState.players = {};
+  players.forEach(p => { ucState.players[p.id] = { ...p, eliminated: false }; });
+
+  // Store settings for when game starts
+  ucLobbySettings = settings;
+
+  if (ucState.isAdmin) {
+    const [word, spyWord] = pickUCWordsFromSettings(settings);
+    const spyId = players[Math.floor(Math.random() * players.length)].id;
+    const wordReveal = {};
+    players.forEach(p => {
+      wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
+    });
+
+    ucState.phase = 'reveal';
+    ucState.round = 1;
+    const myData = wordReveal[ucState.playerId];
+    ucState.myWord = myData.word;
+    ucState.isSpy = myData.isSpy;
+    ucState.wordRevealed = true;
+    ucState.events = [{ text: '🎮 بدأت اللعبة! شاهد كلمتك...', time: now(), isNew: true }];
+
+    if (!demoMode) {
+      update(ref(db, `undercover/${ucState.roomCode}`), {
+        phase: 'reveal', round: 1,
+        players: Object.fromEntries(players.map(p => [p.id, { ...p, eliminated: false }])),
+        spyId, word, spyWord, wordReveal, votes: {},
+        events: ucState.events
+      });
+      listenUCRoom();
+    }
+    showUCWordReveal();
+  } else {
+    if (!demoMode) {
+      update(ref(db, `undercover/${ucState.roomCode}/players`), {
+        [ucState.playerId]: { id: ucState.playerId, name: ucState.playerName, isAdmin: false, eliminated: false }
+      });
+      listenUCRoom();
+    }
+    showUCView('waiting-player');
+  }
+}
+
+let ucLobbySettings = {};
+
+function pickUCWordsFromSettings(settings) {
+  if (settings.customWord1 && settings.customWord2) return [settings.customWord1, settings.customWord2];
+  const cats = (settings.categories && settings.categories.length > 0) ? settings.categories : Object.keys(UC_CATEGORIES);
+  const randomCat = cats[Math.floor(Math.random() * cats.length)];
+  const pairs = UC_CATEGORIES[randomCat] || UC_CATEGORIES['🍕 طعام'];
+  return pairs[Math.floor(Math.random() * pairs.length)];
+}
+
+// =====================================================================
+// RENAME DURING GAME (in-game rename)
+// =====================================================================
+window.renameInGame = async function(game) {
+  const inputId = `${game}-rename-input`;
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const newName = el.value.trim();
+  if (!newName) return showToast('⚠️ أدخل الاسم الجديد');
+
+  const state = game === 'mafia' ? mState : ucState;
+  const oldName = state.playerName;
+  if (newName === oldName) return showToast('⚠️ نفس الاسم');
+
+  state.playerName = newName;
+  state.players[state.playerId].name = newName;
+  el.value = '';
+
+  const eventText = `✏️ ${oldName} غيّر اسمه إلى ${newName}`;
+
+  if (game === 'mafia') {
+    addMafiaEvent(eventText);
+    if (!demoMode) {
+      await update(ref(db, `mafia/${state.roomCode}/players/${state.playerId}`), { name: newName });
+      await update(ref(db, `mafia/${state.roomCode}/events`), Object.fromEntries(state.events.map((e,i)=>[i,e])));
+    }
+    renderMafiaPlayers();
+  } else {
+    addUCEvent(eventText);
+    if (!demoMode) {
+      await update(ref(db, `undercover/${state.roomCode}/players/${state.playerId}`), { name: newName });
+      await update(ref(db, `undercover/${state.roomCode}/events`), Object.fromEntries(state.events.map((e,i)=>[i,e])));
+    }
+    renderUCPlayers();
+  }
+  showToast(`✅ تم تغيير الاسم إلى ${newName}`);
+};
+
+window.goToGame = function(game) {
+  // Legacy: kept for switch button if needed
+};
+
+window.returnToLobby = function() {
+  showHome();
+};
+
+// Switch game: admin only — goes back to lobby for game selection
+window.switchGame = async function() {
+  if (!lobbyState.isAdmin) return showToast('⚠️ فقط المدير يمكنه تغيير اللعبة');
   document.getElementById('mafia-screen').classList.remove('active');
   document.getElementById('undercover-screen').classList.remove('active');
+  document.getElementById('switch-btn').style.display = 'none';
   document.body.classList.remove('undercover-theme');
+
+  // Reset started state so players can rejoin selection
+  if (!demoMode) {
+    await update(ref(db, `lobby/${lobbyState.roomCode}`), { started: false, game: null });
+  }
+  lobbyState.selectedGame = null;
+  document.getElementById('lobby-room-code').textContent = lobbyState.roomCode;
+  document.getElementById('lobby-screen').style.display = 'block';
+  updateLobbyPlayers();
+  renderLobbyCategories();
 };
+
 
 // =====================================================================
 // ==================== MAFIA GAME ====================
@@ -1562,11 +2123,12 @@ window.toggleCategory = function(cat) {
 };
 
 function pickUCWords() {
-  const custom1 = document.getElementById('uc-custom-word1')?.value.trim();
-  const custom2 = document.getElementById('uc-custom-word2')?.value.trim();
-  if (custom1 && custom2) return [custom1, custom2];
-
-  const cats = selectedCategories.length > 0 ? selectedCategories : Object.keys(UC_CATEGORIES);
+  // Use lobby settings if available
+  if (ucLobbySettings && ucLobbySettings.customWord1 && ucLobbySettings.customWord2) {
+    return [ucLobbySettings.customWord1, ucLobbySettings.customWord2];
+  }
+  const cats = (ucLobbySettings && ucLobbySettings.categories && ucLobbySettings.categories.length > 0)
+    ? ucLobbySettings.categories : Object.keys(UC_CATEGORIES);
   const randomCat = cats[Math.floor(Math.random() * cats.length)];
   const pairs = UC_CATEGORIES[randomCat] || UC_CATEGORIES['🍕 طعام'];
   return pairs[Math.floor(Math.random() * pairs.length)];
