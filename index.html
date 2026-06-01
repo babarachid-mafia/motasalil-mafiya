@@ -1211,6 +1211,19 @@ window.toggleSetting = function(el) { el.classList.toggle('on'); };
 // NAVIGATION
 // =====================================================================
 // =====================================================================
+// STABLE DEVICE ID — ثابت لكل جهاز، يبقى حتى بعد الريلود
+// =====================================================================
+function getDeviceId() {
+  let id = localStorage.getItem('gf_device_id');
+  if (!id) {
+    id = 'dev_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    localStorage.setItem('gf_device_id', id);
+  }
+  return id;
+}
+const DEVICE_ID = getDeviceId();
+
+// =====================================================================
 // LOBBY STATE
 // =====================================================================
 let lobbyState = {
@@ -1252,9 +1265,9 @@ window.createRoom = async function() {
   lobbyState.roomCode = code;
   lobbyState.playerName = name;
   lobbyState.isAdmin = true;
-  lobbyState.playerId = name + '_' + Date.now();
+  lobbyState.playerId = DEVICE_ID;
   lobbyState.players = {};
-  lobbyState.players[lobbyState.playerId] = { id: lobbyState.playerId, name, isAdmin: true };
+  lobbyState.players[DEVICE_ID] = { id: DEVICE_ID, name, isAdmin: true };
 
   if (!demoMode) {
     // Check if code already taken
@@ -1263,7 +1276,7 @@ window.createRoom = async function() {
       return showToast('⚠️ هذا الكود مستخدم بالفعل، جرب كوداً آخر');
     }
     await set(ref(db, `lobby/${code}`), {
-      adminId: lobbyState.playerId,
+      adminId: DEVICE_ID,
       players: lobbyState.players,
       game: null, started: false
     });
@@ -1289,12 +1302,12 @@ window.joinRoom = async function() {
   lobbyState.roomCode = code;
   lobbyState.playerName = name;
   lobbyState.isAdmin = false;
-  lobbyState.playerId = name + '_' + Date.now();
+  lobbyState.playerId = DEVICE_ID;
 
   if (demoMode) {
     showToast('⚠️ وضع التجربة: Firebase مطلوب للانضمام من جهاز آخر');
     lobbyState.players = {};
-    lobbyState.players[lobbyState.playerId] = { id: lobbyState.playerId, name, isAdmin: false };
+    lobbyState.players[DEVICE_ID] = { id: DEVICE_ID, name, isAdmin: false };
     document.getElementById('lobby-wait-code').textContent = code;
     document.getElementById('home-screen').style.display = 'none';
     document.getElementById('lobby-waiting-screen').style.display = 'block';
@@ -1305,9 +1318,15 @@ window.joinRoom = async function() {
   const snap = await get(ref(db, `lobby/${code}`));
   if (!snap.exists()) return showToast('❌ الغرفة غير موجودة');
 
-  // Always allow joining — no started check
+  // Check if this device already has a name in the room
+  const existingData = snap.val();
+  const existingPlayer = existingData.players?.[DEVICE_ID];
+  const displayName = existingPlayer ? existingPlayer.name : name; // keep old name if rejoining
+  if (existingPlayer) lobbyState.playerName = existingPlayer.name;
+
+  // Always allow joining — upsert player
   await update(ref(db, `lobby/${code}/players`), {
-    [lobbyState.playerId]: { id: lobbyState.playerId, name, isAdmin: false }
+    [DEVICE_ID]: { id: DEVICE_ID, name: displayName, isAdmin: existingPlayer?.isAdmin || false }
   });
 
   saveSession();
@@ -1322,47 +1341,49 @@ window.joinRoom = async function() {
 // =====================================================================
 function saveSession() {
   try {
-    sessionStorage.setItem('gfSession', JSON.stringify({
+    localStorage.setItem('gfSession', JSON.stringify({
       roomCode: lobbyState.roomCode,
       playerName: lobbyState.playerName,
-      playerId: lobbyState.playerId,
       isAdmin: lobbyState.isAdmin
+      // No playerId — always DEVICE_ID
     }));
   } catch(e) {}
 }
 
 async function restoreSession() {
   try {
-    const raw = sessionStorage.getItem('gfSession');
+    const raw = localStorage.getItem('gfSession');
     if (!raw) return false;
     const s = JSON.parse(raw);
-    if (!s.roomCode || !s.playerId) return false;
+    if (!s.roomCode) return false;
 
-    // Check if room still exists
     if (demoMode) return false;
     const snap = await get(ref(db, `lobby/${s.roomCode}`));
-    if (!snap.exists()) { sessionStorage.removeItem('gfSession'); return false; }
-
-    // Re-register player in lobby
-    lobbyState.roomCode = s.roomCode;
-    lobbyState.playerName = s.playerName;
-    lobbyState.playerId = s.playerId;
-    lobbyState.isAdmin = s.isAdmin;
-
-    await update(ref(db, `lobby/${s.roomCode}/players/${s.playerId}`), {
-      id: s.playerId, name: s.playerName, isAdmin: s.isAdmin
-    });
+    if (!snap.exists()) { localStorage.removeItem('gfSession'); return false; }
 
     const data = snap.val();
-    lobbyState.players = data.players || {};
 
+    // Re-register this device in the lobby (keep existing name if present)
+    const existing = data.players?.[DEVICE_ID];
+    const name = existing?.name || s.playerName;
+    const isAdmin = existing?.isAdmin || s.isAdmin || (data.adminId === DEVICE_ID);
+
+    lobbyState.roomCode = s.roomCode;
+    lobbyState.playerName = name;
+    lobbyState.playerId = DEVICE_ID;
+    lobbyState.isAdmin = isAdmin;
+
+    await update(ref(db, `lobby/${s.roomCode}/players/${DEVICE_ID}`), {
+      id: DEVICE_ID, name, isAdmin
+    });
+
+    lobbyState.players = data.players || {};
     document.getElementById('home-screen').style.display = 'none';
 
     if (data.started && data.game) {
-      // Game already running — rejoin
       document.getElementById('switch-btn').style.display = 'flex';
       startGameFromLobby(data.game, data.gameSettings || {});
-    } else if (s.isAdmin) {
+    } else if (isAdmin) {
       document.getElementById('lobby-room-code').textContent = s.roomCode;
       document.getElementById('lobby-screen').style.display = 'block';
       renderLobbyCategories();
@@ -1380,17 +1401,26 @@ async function restoreSession() {
 // =====================================================================
 // LOBBY LISTEN
 // =====================================================================
+let _lobbyGameLaunched = false;
+
 function listenLobby() {
+  _lobbyGameLaunched = false;
   onValue(ref(db, `lobby/${lobbyState.roomCode}`), snap => {
     if (!snap.exists()) return;
     const data = snap.val();
     lobbyState.players = data.players || {};
 
-    updateLobbyPlayers();
-    updateLobbyWaitingPlayers();
+    // Only update UI if we're still in lobby screens
+    const inLobby = document.getElementById('lobby-screen').style.display !== 'none' ||
+                    document.getElementById('lobby-waiting-screen').style.display !== 'none';
+    if (inLobby) {
+      updateLobbyPlayers();
+      updateLobbyWaitingPlayers();
+    }
 
-    // If game started, switch to that game
-    if (data.started && data.game) {
+    // Launch game only once
+    if (data.started && data.game && !_lobbyGameLaunched) {
+      _lobbyGameLaunched = true;
       saveSession();
       startGameFromLobby(data.game, data.gameSettings || {});
     }
@@ -1534,48 +1564,61 @@ function launchMafiaFromLobby(players, settings) {
   document.body.classList.remove('undercover-theme');
   document.getElementById('mafia-screen').classList.add('active');
   document.getElementById('undercover-screen').classList.remove('active');
+  document.getElementById('lobby-screen').style.display = 'none';
+  document.getElementById('lobby-waiting-screen').style.display = 'none';
 
-  // Transfer lobby state to mState
   mState.roomCode = lobbyState.roomCode;
-  mState.playerId = lobbyState.playerId;
+  mState.playerId = DEVICE_ID;
   mState.playerName = lobbyState.playerName;
   mState.isAdmin = lobbyState.isAdmin;
-  mState.players = {};
-  players.forEach(p => { mState.players[p.id] = { ...p, eliminated: false }; });
 
-  if (mState.isAdmin) {
-    // Admin directly starts the game
+  if (!demoMode) {
+    // For non-admin: just listen and rejoin
+    // For admin: set up game if not already started
+    if (mState.isAdmin) {
+      get(ref(db, `mafia/${mState.roomCode}/phase`)).then(snap => {
+        if (!snap.exists() || snap.val() === 'waiting') {
+          // First time — assign roles and start
+          const roles = assignMafiaRoles(players, settings);
+          const updatedPlayers = {};
+          players.forEach(p => { updatedPlayers[p.id] = { ...p, role: roles[p.id], eliminated: false }; });
+          update(ref(db, `mafia/${mState.roomCode}`), {
+            phase: 'day', round: 1, players: updatedPlayers,
+            roleReveal: roles, votes: {},
+            events: [{ text: '🎮 بدأت المافيا! مرحلة النهار الأولى.', time: now(), isNew: true }]
+          });
+        }
+        listenMafiaRoom();
+      });
+    } else {
+      // Register player in mafia room (won't overwrite role if already assigned)
+      get(ref(db, `mafia/${mState.roomCode}/players/${DEVICE_ID}`)).then(snap => {
+        if (!snap.exists()) {
+          update(ref(db, `mafia/${mState.roomCode}/players`), {
+            [DEVICE_ID]: { id: DEVICE_ID, name: mState.playerName, isAdmin: false, eliminated: false }
+          });
+        }
+        listenMafiaRoom();
+      });
+    }
+    showMafiaView('game'); // will update on first listen
+  } else {
+    // Demo mode
+    mState.players = {};
+    players.forEach(p => { mState.players[p.id] = { ...p, eliminated: false }; });
     const roles = assignMafiaRoles(players, settings);
     const updatedPlayers = {};
     players.forEach(p => { updatedPlayers[p.id] = { ...p, role: roles[p.id], eliminated: false }; });
     mState.players = updatedPlayers;
     mState.phase = 'day';
     mState.events = [{ text: '🎮 بدأت المافيا! مرحلة النهار الأولى.', time: now(), isNew: true }];
-    mState.myRole = roles[mState.playerId];
+    mState.myRole = roles[DEVICE_ID] || roles[Object.keys(roles)[0]];
     mState.roleShown = true;
-
-    if (!demoMode) {
-      update(ref(db, `mafia/${mState.roomCode}`), {
-        phase: 'day', round: 1, players: updatedPlayers,
-        roleReveal: roles, votes: {},
-        events: mState.events
-      });
-      listenMafiaRoom();
-    }
-
     showMafiaView('game');
     showRoleReveal(mState.myRole);
     renderMafiaPlayers();
     renderMafiaEvents();
     updateMafiaPhaseUI();
-  } else {
-    if (!demoMode) {
-      update(ref(db, `mafia/${mState.roomCode}/players`), {
-        [mState.playerId]: { id: mState.playerId, name: mState.playerName, isAdmin: false, eliminated: false }
-      });
-      listenMafiaRoom();
-    }
-    showMafiaView('waiting-player');
   }
 }
 
@@ -1583,51 +1626,57 @@ function launchUCFromLobby(players, settings) {
   document.body.classList.add('undercover-theme');
   document.getElementById('undercover-screen').classList.add('active');
   document.getElementById('mafia-screen').classList.remove('active');
+  document.getElementById('lobby-screen').style.display = 'none';
+  document.getElementById('lobby-waiting-screen').style.display = 'none';
 
   ucState.roomCode = lobbyState.roomCode;
-  ucState.playerId = lobbyState.playerId;
+  ucState.playerId = DEVICE_ID;
   ucState.playerName = lobbyState.playerName;
   ucState.isAdmin = lobbyState.isAdmin;
-  ucState.players = {};
-  players.forEach(p => { ucState.players[p.id] = { ...p, eliminated: false }; });
-
-  // Store settings for when game starts
   ucLobbySettings = settings;
 
-  if (ucState.isAdmin) {
+  if (!demoMode) {
+    if (ucState.isAdmin) {
+      get(ref(db, `undercover/${ucState.roomCode}/phase`)).then(snap => {
+        if (!snap.exists() || snap.val() === 'waiting') {
+          // First launch — pick words and distribute
+          const [word, spyWord] = pickUCWordsFromSettings(settings);
+          const spyId = players[Math.floor(Math.random() * players.length)].id;
+          const wordReveal = {};
+          players.forEach(p => {
+            wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
+          });
+          update(ref(db, `undercover/${ucState.roomCode}`), {
+            phase: 'reveal', round: 1,
+            players: Object.fromEntries(players.map(p => [p.id, { ...p, eliminated: false }])),
+            spyId, word, spyWord, wordReveal, votes: {}, seenReveal: {},
+            events: [{ text: '🎮 بدأت اللعبة! شاهد كلمتك...', time: now(), isNew: true }]
+          });
+        }
+        listenUCRoom();
+      });
+    } else {
+      listenUCRoom();
+    }
+  } else {
+    // Demo
+    ucState.players = {};
+    players.forEach(p => { ucState.players[p.id] = { ...p, eliminated: false }; });
     const [word, spyWord] = pickUCWordsFromSettings(settings);
     const spyId = players[Math.floor(Math.random() * players.length)].id;
     const wordReveal = {};
     players.forEach(p => {
       wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
     });
-
     ucState.phase = 'reveal';
     ucState.round = 1;
-    const myData = wordReveal[ucState.playerId];
+    ucState.spyId = spyId;
+    const myData = wordReveal[DEVICE_ID] || wordReveal[Object.keys(wordReveal)[0]];
     ucState.myWord = myData.word;
     ucState.isSpy = myData.isSpy;
     ucState.wordRevealed = true;
-    ucState.events = [{ text: '🎮 بدأت اللعبة! شاهد كلمتك...', time: now(), isNew: true }];
-
-    if (!demoMode) {
-      update(ref(db, `undercover/${ucState.roomCode}`), {
-        phase: 'reveal', round: 1,
-        players: Object.fromEntries(players.map(p => [p.id, { ...p, eliminated: false }])),
-        spyId, word, spyWord, wordReveal, votes: {},
-        events: ucState.events
-      });
-      listenUCRoom();
-    }
+    ucState.events = [{ text: '🎮 بدأت اللعبة!', time: now(), isNew: true }];
     showUCWordReveal();
-  } else {
-    if (!demoMode) {
-      update(ref(db, `undercover/${ucState.roomCode}/players`), {
-        [ucState.playerId]: { id: ucState.playerId, name: ucState.playerName, isAdmin: false, eliminated: false }
-      });
-      listenUCRoom();
-    }
-    showUCView('waiting-player');
   }
 }
 
@@ -1787,7 +1836,7 @@ window.joinMafiaRoom = async function() {
   mState.roomCode = code;
   mState.playerName = name;
   mState.isAdmin = isNew;
-  mState.playerId = name + '_' + Date.now();
+  mState.playerId = DEVICE_ID;
 
   if (demoMode) {
     // DEMO: run locally
@@ -1843,10 +1892,15 @@ function listenMafiaRoom() {
     if (data.phase === 'waiting') {
       updateMafiaWaiting();
     } else {
-      if (data.roleReveal && data.roleReveal[mState.playerId] && !mState.roleShown) {
-        mState.myRole = data.roleReveal[mState.playerId];
+      // Show role if not yet shown
+      if (data.roleReveal && data.roleReveal[DEVICE_ID] && !mState.roleShown) {
+        mState.myRole = data.roleReveal[DEVICE_ID];
         mState.roleShown = true;
         showRoleReveal(mState.myRole);
+      }
+      // Set myRole from existing data even on rejoin
+      if (data.roleReveal && data.roleReveal[DEVICE_ID] && !mState.myRole) {
+        mState.myRole = data.roleReveal[DEVICE_ID];
       }
       showMafiaView('game');
       renderMafiaPlayers();
@@ -2293,7 +2347,7 @@ window.joinUCRoom = async function() {
   ucState.roomCode = code;
   ucState.playerName = name;
   ucState.isAdmin = isNew;
-  ucState.playerId = name + '_' + Date.now();
+  ucState.playerId = DEVICE_ID;
 
   if (demoMode) {
     ucState.players = {};
@@ -2344,13 +2398,18 @@ function listenUCRoom() {
       updateUCWaiting();
     } else if (data.phase === 'reveal') {
       const myData = data.wordReveal?.[ucState.playerId];
-      if (myData && !ucState.wordRevealed) {
+      const alreadySeen = data.seenReveal?.[ucState.playerId];
+      if (myData && !alreadySeen) {
         ucState.myWord = myData.word;
         ucState.isSpy = myData.isSpy;
-        ucState.wordRevealed = true;
         showUCWordReveal();
-      } else if (!myData) {
+      } else if (alreadySeen) {
+        // Already confirmed — show game screen
         showUCView('game');
+        renderUCPlayers();
+        renderUCEvents();
+        const adminCtrl = document.getElementById('uc-admin-controls');
+        if (adminCtrl) adminCtrl.style.display = ucState.isAdmin ? 'block' : 'none';
       }
     } else {
       showUCView('game');
@@ -2468,20 +2527,40 @@ function showUCWordReveal() {
 }
 
 window.doneReveal = async function() {
-  // Remove this player from reveal list
-  if (!demoMode) {
-    await update(ref(db, `undercover/${ucState.roomCode}/wordReveal/${ucState.playerId}/seen`), true);
+  if (demoMode) {
+    ucState.phase = 'playing';
+    showUCView('game');
+    renderUCPlayers();
+    renderUCEvents();
+    const adminCtrl = document.getElementById('uc-admin-controls');
+    if (adminCtrl) adminCtrl.style.display = ucState.isAdmin ? 'block' : 'none';
+    return;
   }
+
+  // Mark this player as having seen their word
+  await update(ref(db, `undercover/${ucState.roomCode}/seenReveal`), {
+    [ucState.playerId]: true
+  });
+
+  // Show game screen immediately for this player
   showUCView('game');
   renderUCPlayers();
   renderUCEvents();
   const adminCtrl = document.getElementById('uc-admin-controls');
   if (adminCtrl) adminCtrl.style.display = ucState.isAdmin ? 'block' : 'none';
-  // Transition to 'playing' phase
-  if (ucState.isAdmin && !demoMode) {
-    await update(ref(db, `undercover/${ucState.roomCode}`), { phase: 'playing' });
-  } else if (demoMode) {
-    ucState.phase = 'playing';
+
+  // Admin: check if all non-eliminated players have seen → advance to 'playing'
+  if (ucState.isAdmin) {
+    const roomSnap = await get(ref(db, `undercover/${ucState.roomCode}`));
+    if (!roomSnap.exists()) return;
+    const d = roomSnap.val();
+    const players = Object.values(d.players || {}).filter(p => !p.eliminated);
+    const seen = d.seenReveal || {};
+    const allSeen = players.every(p => seen[p.id]);
+    if (allSeen) {
+      await update(ref(db, `undercover/${ucState.roomCode}`), { phase: 'playing' });
+    }
+    // Note: listenUCRoom will handle the phase change for all players
   }
 };
 
@@ -2608,6 +2687,7 @@ async function startNewUCRoundAuto(eventPrefix) {
     word, spyWord,
     wordReveal,
     votes: {},
+    seenReveal: {},
     events: evts
   };
 
