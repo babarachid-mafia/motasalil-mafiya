@@ -958,6 +958,14 @@
         </div>
       </div>
 
+      <!-- MAFIA PLAYER NIGHT ACTION (non-admin mafia) -->
+      <div class="card" id="m-mafia-player-action" style="display:none;border-color:#e63946;background:#1a0a0a">
+        <h2 style="color:#e63946">🔫 اختر ضحيتك الليلة</h2>
+        <select id="m-mafia-suggestion" style="width:100%;margin-top:0.5rem"></select>
+        <button class="btn btn-red" onclick="suggestMafiaTarget()" style="margin-top:0.75rem">🎯 اقترح الهدف</button>
+        <div style="font-size:0.75rem;color:#555;margin-top:0.5rem">اقتراحك يظهر للمدير</div>
+      </div>
+
       <!-- MY NIGHT ACTION -->
       <div class="card" id="m-my-night-action" style="display:none">
         <div id="m-night-action-content"></div>
@@ -1113,9 +1121,13 @@
       <!-- ADMIN CONTROLS -->
       <div class="card" id="uc-admin-controls" style="display:none;background:#161b22;border-color:#30363d">
         <h2 style="color:#e6edf3">🎮 تحكم المدير</h2>
-        <div class="grid-2">
-          <button class="btn btn-blue" onclick="advanceUCPhase()">⏭️ التالي</button>
-          <button class="btn btn-outline" onclick="newUCRound()" style="border-color:#30363d;color:#8b949e">🔄 جولة جديدة</button>
+        <div id="uc-phase-btn-area" style="display:grid;gap:0.5rem">
+          <button class="btn btn-blue" id="uc-advance-btn" onclick="advanceUCPhase()">⏭️ بدأ التصويت</button>
+        </div>
+        <div style="height:0.75rem"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem">
+          <button class="btn btn-outline" onclick="continueUCRound()" style="border-color:#3fb950;color:#3fb950;font-size:0.8rem">▶️ تتمة الجولة<br><span style="font-size:0.7rem;opacity:0.7">المتبقين فقط</span></button>
+          <button class="btn btn-outline" onclick="restartUCGame()" style="border-color:#ffd60a;color:#ffd60a;font-size:0.8rem">🔄 إعادة اللعب<br><span style="font-size:0.7rem;opacity:0.7">كل اللاعبين</span></button>
         </div>
         <button class="btn btn-outline" onclick="switchGame()" style="margin-top:0.5rem;border-color:#e63946;color:#e63946">🔀 تغيير اللعبة</button>
       </div>
@@ -1141,7 +1153,11 @@
     <div class="gameover-emoji" id="uc-go-emoji">🕵️</div>
     <div class="gameover-title" id="uc-go-title" style="color:#58a6ff">انتهت الجولة</div>
     <div class="gameover-desc" id="uc-go-desc"></div>
-    <button class="big-btn blue" onclick="closeUCGameover()">جولة جديدة</button>
+    <div id="uc-go-admin-btns" style="display:none;width:100%;display:flex;flex-direction:column;gap:0.75rem;margin-top:0.5rem">
+      <button class="big-btn blue" onclick="closeUCGameoverContinue()">▶️ تتمة الجولة<br><small style="font-weight:400;opacity:0.8">يلعب المتبقون فقط بمتسلل جديد</small></button>
+      <button class="btn btn-outline" onclick="closeUCGameoverRestart()" style="border-color:#ffd60a;color:#ffd60a">🔄 إعادة اللعب بالجميع<br><small style="font-weight:400;opacity:0.8">المقصيون يرجعون للعب</small></button>
+    </div>
+    <div id="uc-go-player-msg" style="display:none;color:#8b949e;font-size:0.9rem;margin-top:0.75rem">في انتظار قرار المدير...</div>
   </div>
 </div>
 
@@ -1260,6 +1276,9 @@ window.createRoom = async function() {
   const name = document.getElementById('home-create-name').value.trim();
   const customCode = document.getElementById('home-create-code').value.trim().toUpperCase().replace(/\s/g,'');
   if (!name) return showToast('⚠️ أدخل اسمك');
+
+  const btnCreate = document.querySelector('[onclick="createRoom()"]');
+  if (btnCreate) { btnCreate.disabled = true; btnCreate.textContent = '⏳ جاري الإنشاء...'; }
 
   const code = customCode || randCode();
   lobbyState.roomCode = code;
@@ -1526,8 +1545,11 @@ window.startLobbyGame = async function() {
   if (game === 'mafia' && players.length < 4) return showToast('⚠️ تحتاج 4+ لاعبين للمافيا');
   if (game === 'undercover' && players.length < 3) return showToast('⚠️ تحتاج 3+ لاعبين للمتسلل');
 
-  const gameSettings = {};
+  const btn = document.getElementById('lobby-start-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ جاري التهيئة...'; }
+  showToast('⏳ جاري تحضير اللعبة...');
 
+  const gameSettings = {};
   if (game === 'mafia') {
     gameSettings.mafiaCount = document.getElementById('lobby-mafia-count').value;
     gameSettings.detective = document.getElementById('lobby-toggle-detective').classList.contains('on');
@@ -1540,10 +1562,15 @@ window.startLobbyGame = async function() {
     gameSettings.categories = lobbySelectedCategories;
   }
 
-  if (!demoMode) {
-    await update(ref(db, `lobby/${lobbyState.roomCode}`), { started: true, game, gameSettings });
-  } else {
-    startGameFromLobby(game, gameSettings);
+  try {
+    if (!demoMode) {
+      await update(ref(db, `lobby/${lobbyState.roomCode}`), { started: true, game, gameSettings });
+    } else {
+      startGameFromLobby(game, gameSettings);
+    }
+  } catch(e) {
+    showToast('❌ خطأ — تحقق من الاتصال');
+    if (btn) { btn.disabled = false; btn.textContent = '▶️ ابدأ اللعبة'; }
   }
 };
 
@@ -2044,28 +2071,54 @@ function updateMafiaPhaseUI() {
   if (adminCtrl) adminCtrl.style.display = mState.isAdmin ? 'block' : 'none';
   if (nightActions) nightActions.style.display = mState.phase === 'night' && mState.isAdmin ? 'block' : 'none';
 
+  // Night actions — مفصولة: المدير يشوف القتل فقط، الطبيب والمحقق يشوفوا أكشنهم فقط
   if (nightSelect && mState.phase === 'night' && mState.isAdmin) {
     nightSelect.style.display = 'block';
     const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && p.role !== 'mafia');
     const sel = document.getElementById('m-mafia-target');
     if (sel) sel.innerHTML = aliveNonMafia.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  } else if (nightSelect) {
+    nightSelect.style.display = 'none';
   }
 
-  // My night action
+  // أكشن المافيا غير المدير (يقترح ضحية)
+  const mafiaActionDiv = document.getElementById('m-mafia-player-action');
+  if (mafiaActionDiv) {
+    const isMafia = mState.myRole === 'mafia';
+    const isNight = mState.phase === 'night';
+    if (isMafia && isNight && !mState.isAdmin) {
+      mafiaActionDiv.style.display = 'block';
+      const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && p.role !== 'mafia');
+      const sel = document.getElementById('m-mafia-suggestion');
+      if (sel) sel.innerHTML = aliveNonMafia.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    } else {
+      mafiaActionDiv.style.display = 'none';
+    }
+  }
+
+  // My night action — فقط للطبيب والمحقق اللي ليسوا المدير (أو المدير إذا كان دوره طبيب/محقق)
   if (myNight) {
     const myRole = mState.myRole;
-    if (mState.phase === 'night' && (myRole === 'detective' || myRole === 'doctor')) {
+    const isSpecialRole = myRole === 'detective' || myRole === 'doctor';
+    // إذا المدير دوره مافيا → يشوف القتل فوق فقط، لا يشوف أكشن إضافي
+    // إذا المدير دوره طبيب/محقق → يشوف أكشنه الخاص هنا
+    // إذا ليس مديراً ودوره خاص → يشوف أكشنه هنا
+    if (mState.phase === 'night' && isSpecialRole) {
       myNight.style.display = 'block';
       const alive = Object.values(mState.players).filter(p => !p.eliminated);
       const content = document.getElementById('m-night-action-content');
-      if (myRole === 'detective') {
-        content.innerHTML = `<div style="font-size:0.9rem;color:#ffd60a;margin-bottom:0.75rem">🔍 اختر لاعبًا لاكتشاف هويته:</div>
-          <select id="m-detective-sel">${alive.filter(p=>p.id!==mState.playerId).map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select>
-          <button class="btn btn-gold" onclick="doDetectiveAction()" style="margin-top:0.5rem">🔍 تحقق</button>`;
-      } else if (myRole === 'doctor') {
-        content.innerHTML = `<div style="font-size:0.9rem;color:#52b788;margin-bottom:0.75rem">💊 اختر لاعبًا لحمايته:</div>
-          <select id="m-doctor-sel">${alive.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select>
-          <button class="btn btn-green" onclick="doDoctorAction()" style="margin-top:0.5rem">💊 احمِ</button>`;
+      if (content) {
+        if (myRole === 'detective') {
+          content.innerHTML = `
+            <div style="font-size:0.9rem;color:#ffd60a;margin-bottom:0.75rem">🔍 اختر لاعبًا لاكتشاف هويته:</div>
+            <select id="m-detective-sel">${alive.filter(p=>p.id!==mState.playerId).map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select>
+            <button class="btn btn-gold" onclick="doDetectiveAction()" style="margin-top:0.5rem">🔍 تحقق</button>`;
+        } else if (myRole === 'doctor') {
+          content.innerHTML = `
+            <div style="font-size:0.9rem;color:#52b788;margin-bottom:0.75rem">💊 اختر لاعبًا لحمايته:</div>
+            <select id="m-doctor-sel">${alive.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select>
+            <button class="btn btn-green" onclick="doDoctorAction()" style="margin-top:0.5rem">💊 احمِ</button>`;
+        }
       }
     } else {
       myNight.style.display = 'none';
@@ -2090,7 +2143,21 @@ window.doDoctorAction = function() {
   showToast('💊 تم حفظ اختيارك!');
 };
 
-window.setMafiaTarget = function() {
+window.suggestMafiaTarget = async function() {
+  const sel = document.getElementById('m-mafia-suggestion');
+  if (!sel) return;
+  const targetId = sel.value;
+  const target = mState.players[targetId];
+  if (!target) return;
+  showToast(`🎯 اقترحت ${target.name} للمدير`);
+  if (!demoMode) {
+    await update(ref(db, `mafia/${mState.roomCode}/mafiaSuggestions`), {
+      [mState.playerId]: targetId
+    });
+  }
+};
+
+
   const sel = document.getElementById('m-mafia-target');
   if (sel) { mState.mafiaTarget = sel.value; showToast('✅ تم تحديد الهدف'); }
 };
@@ -2397,19 +2464,32 @@ function listenUCRoom() {
     if (data.phase === 'waiting') {
       updateUCWaiting();
     } else if (data.phase === 'reveal') {
+      // Close gameover if open (new round started)
+      const go = document.getElementById('uc-gameover');
+      if (go) go.style.display = 'none';
+
       const myData = data.wordReveal?.[ucState.playerId];
       const alreadySeen = data.seenReveal?.[ucState.playerId];
-      if (myData && !alreadySeen) {
+
+      if (!alreadySeen && myData) {
         ucState.myWord = myData.word;
         ucState.isSpy = myData.isSpy;
         showUCWordReveal();
-      } else if (alreadySeen) {
-        // Already confirmed — show game screen
+      } else {
         showUCView('game');
         renderUCPlayers();
         renderUCEvents();
         const adminCtrl = document.getElementById('uc-admin-controls');
         if (adminCtrl) adminCtrl.style.display = ucState.isAdmin ? 'block' : 'none';
+      }
+
+      // Admin: auto-advance when all alive players confirmed
+      if (ucState.isAdmin && data.seenReveal && data.phase === 'reveal') {
+        const alivePlayers = Object.values(data.players || {}).filter(p => !p.eliminated);
+        const seen = data.seenReveal || {};
+        if (alivePlayers.length > 0 && alivePlayers.every(p => seen[p.id])) {
+          update(ref(db, `undercover/${ucState.roomCode}`), { phase: 'playing' });
+        }
       }
     } else {
       showUCView('game');
@@ -2419,6 +2499,7 @@ function listenUCRoom() {
       if (badge) badge.textContent = `جولة ${ucState.round}`;
       const adminCtrl = document.getElementById('uc-admin-controls');
       if (adminCtrl) adminCtrl.style.display = ucState.isAdmin ? 'block' : 'none';
+      updateUCAdminButtons();
     }
   });
 }
@@ -2542,26 +2623,15 @@ window.doneReveal = async function() {
     [ucState.playerId]: true
   });
 
-  // Show game screen immediately for this player
+  // Show game screen immediately — don't wait for others
   showUCView('game');
   renderUCPlayers();
   renderUCEvents();
   const adminCtrl = document.getElementById('uc-admin-controls');
   if (adminCtrl) adminCtrl.style.display = ucState.isAdmin ? 'block' : 'none';
 
-  // Admin: check if all non-eliminated players have seen → advance to 'playing'
-  if (ucState.isAdmin) {
-    const roomSnap = await get(ref(db, `undercover/${ucState.roomCode}`));
-    if (!roomSnap.exists()) return;
-    const d = roomSnap.val();
-    const players = Object.values(d.players || {}).filter(p => !p.eliminated);
-    const seen = d.seenReveal || {};
-    const allSeen = players.every(p => seen[p.id]);
-    if (allSeen) {
-      await update(ref(db, `undercover/${ucState.roomCode}`), { phase: 'playing' });
-    }
-    // Note: listenUCRoom will handle the phase change for all players
-  }
+  // Admin watches seenReveal — when all have confirmed, advance to 'playing'
+  // This is handled reactively in listenUCRoom when seenReveal changes
 };
 
 function showUCView(view) {
@@ -2574,7 +2644,73 @@ function showUCView(view) {
   if (view === 'join') document.getElementById('uc-join').style.display = 'block';
 }
 
-window.advanceUCPhase = async function() {
+function updateUCAdminButtons() {
+  if (!ucState.isAdmin) return;
+  const btn = document.getElementById('uc-advance-btn');
+  const area = document.getElementById('uc-phase-btn-area');
+  if (!btn || !area) return;
+  if (ucState.phase === 'playing') {
+    btn.textContent = '🗳️ بدأ التصويت';
+    btn.style.display = 'block';
+  } else if (ucState.phase === 'vote') {
+    btn.textContent = '⚖️ نهاية التصويت وإقصاء';
+    btn.style.display = 'block';
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+// تتمة الجولة بنفس اللاعبين المتبقين
+window.continueUCRound = async function() {
+  if (!ucState.isAdmin) return;
+  const alivePlayers = Object.values(ucState.players).filter(p => !p.eliminated);
+  if (alivePlayers.length < 2) return showToast('⚠️ لا يكفي لاعبون للاستمرار');
+  await startNewUCRoundAuto('▶️ تتمة اللعبة بالمتبقين');
+};
+
+// إعادة اللعب — كل اللاعبين يرجعوا
+window.restartUCGame = async function() {
+  if (!ucState.isAdmin) return;
+  const allPlayers = Object.values(ucState.players);
+  if (allPlayers.length < 2) return showToast('⚠️ لا يكفي لاعبون');
+
+  // Reset all to not-eliminated
+  const resetPlayers = {};
+  allPlayers.forEach(p => { resetPlayers[p.id] = { ...p, eliminated: false }; });
+
+  const [word, spyWord] = pickUCWords();
+  const spyId = allPlayers[Math.floor(Math.random() * allPlayers.length)].id;
+  const wordReveal = {};
+  allPlayers.forEach(p => {
+    wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
+  });
+
+  const updates = {
+    phase: 'reveal',
+    round: 1,
+    spyId, word, spyWord,
+    wordReveal,
+    votes: {},
+    seenReveal: {},
+    players: resetPlayers,
+    events: [{ text: '🔄 إعادة اللعب — كل اللاعبين!', time: now(), isNew: true }]
+  };
+
+  if (demoMode) {
+    ucState.phase = 'reveal';
+    ucState.round = 1;
+    ucState.spyId = spyId;
+    ucState.votes = {};
+    ucState.players = resetPlayers;
+    ucState.events = updates.events;
+    const myData = wordReveal[ucState.playerId];
+    if (myData) { ucState.myWord = myData.word; ucState.isSpy = myData.isSpy; showUCWordReveal(); }
+    return;
+  }
+  await update(ref(db, `undercover/${ucState.roomCode}`), updates);
+};
+
+
   const current = ucState.phase;
   let next, eventText, updates = {};
 
@@ -2622,12 +2758,13 @@ window.advanceUCPhase = async function() {
       const evts = [{ text: eventText, time: now(), isNew: true }, ...ucState.events].slice(0,5);
       if (demoMode) { ucState.events = evts; renderUCEvents(); }
       else await update(ref(db, `undercover/${ucState.roomCode}/events`), Object.fromEntries(evts.map((e,i)=>[i,e])));
-
       showUCGameover(true, eliminatedName);
     } else {
-      // Check if spy wins (≤2 alive non-eliminated)
-      const alivePlayers = Object.values(ucState.players).filter(p => !p.eliminated);
-      if (alivePlayers.length <= 2) {
+      // Count alive (after elimination)
+      const alivePlayers = Object.values(ucState.players).filter(p => !p.eliminated && p.id !== eliminatedId);
+      const aliveNonSpy = alivePlayers.filter(p => p.id !== ucState.spyId);
+      // Spy wins when only 1 non-spy left (spy vs 1 player)
+      if (aliveNonSpy.length <= 1) {
         eventText = eliminatedId
           ? `❌ تم إقصاء ${eliminatedName} — لم يكن المتسلل! فاز المتسلل 🕵️`
           : '🕵️ لا أحد صوّت — فاز المتسلل!';
@@ -2636,7 +2773,7 @@ window.advanceUCPhase = async function() {
         else await update(ref(db, `undercover/${ucState.roomCode}/events`), Object.fromEntries(evts.map((e,i)=>[i,e])));
         showUCGameover(false, '');
       } else {
-        // Start new round automatically with remaining players
+        // Continue: new round with remaining players
         eventText = eliminatedId
           ? `❌ تم إقصاء ${eliminatedName} — لم يكن المتسلل! جولة جديدة...`
           : '🤷 لا أحد صوّت — جولة جديدة!';
@@ -2751,11 +2888,31 @@ function showUCGameover(spyCaught, spyName) {
     document.getElementById('uc-go-title').textContent = 'فاز المتسلل!';
     document.getElementById('uc-go-desc').textContent = `نجح المتسلل في البقاء مجهولًا...`;
   }
+  // Admin sees two buttons, others wait
+  const adminBtns = document.getElementById('uc-go-admin-btns');
+  const playerMsg = document.getElementById('uc-go-player-msg');
+  if (ucState.isAdmin) {
+    if (adminBtns) adminBtns.style.display = 'flex';
+    if (playerMsg) playerMsg.style.display = 'none';
+  } else {
+    if (adminBtns) adminBtns.style.display = 'none';
+    if (playerMsg) playerMsg.style.display = 'block';
+  }
 }
 
+window.closeUCGameoverContinue = async function() {
+  document.getElementById('uc-gameover').style.display = 'none';
+  await continueUCRound();
+};
+
+window.closeUCGameoverRestart = async function() {
+  document.getElementById('uc-gameover').style.display = 'none';
+  await restartUCGame();
+};
+
+// Keep old for compatibility
 window.closeUCGameover = function() {
   document.getElementById('uc-gameover').style.display = 'none';
-  newUCRound();
 };
 
 window.newUCRound = async function() {
@@ -2768,8 +2925,14 @@ window.newUCRound = async function() {
 
 // Init
 renderUCCategories();
-// Try to restore session after page reload
-restoreSession();
+
+// Wait for DOM to be fully ready, then try restore
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => restoreSession());
+} else {
+  // Small delay to ensure Firebase is connected before reading
+  setTimeout(() => restoreSession(), 300);
+}
 </script>
 </body>
 </html>
