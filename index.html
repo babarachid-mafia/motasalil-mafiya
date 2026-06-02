@@ -1153,7 +1153,7 @@
     <div class="gameover-emoji" id="uc-go-emoji">🕵️</div>
     <div class="gameover-title" id="uc-go-title" style="color:#58a6ff">انتهت الجولة</div>
     <div class="gameover-desc" id="uc-go-desc"></div>
-    <div id="uc-go-admin-btns" style="display:none;width:100%;display:flex;flex-direction:column;gap:0.75rem;margin-top:0.5rem">
+    <div id="uc-go-admin-btns" style="width:100%;display:flex;flex-direction:column;gap:0.75rem;margin-top:0.5rem;display:none">
       <button class="big-btn blue" onclick="closeUCGameoverContinue()">▶️ تتمة الجولة<br><small style="font-weight:400;opacity:0.8">يلعب المتبقون فقط بمتسلل جديد</small></button>
       <button class="btn btn-outline" onclick="closeUCGameoverRestart()" style="border-color:#ffd60a;color:#ffd60a">🔄 إعادة اللعب بالجميع<br><small style="font-weight:400;opacity:0.8">المقصيون يرجعون للعب</small></button>
     </div>
@@ -2071,12 +2071,18 @@ function updateMafiaPhaseUI() {
   if (adminCtrl) adminCtrl.style.display = mState.isAdmin ? 'block' : 'none';
   if (nightActions) nightActions.style.display = mState.phase === 'night' && mState.isAdmin ? 'block' : 'none';
 
-  // Night actions — مفصولة: المدير يشوف القتل فقط، الطبيب والمحقق يشوفوا أكشنهم فقط
+  // Night actions — مفصولة: المدير يشوف القتل فقط إذا دوره مافيا، الطبيب والمحقق يشوفوا أكشنهم فقط
   if (nightSelect && mState.phase === 'night' && mState.isAdmin) {
-    nightSelect.style.display = 'block';
-    const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && p.role !== 'mafia');
-    const sel = document.getElementById('m-mafia-target');
-    if (sel) sel.innerHTML = aliveNonMafia.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    // المدير يشوف قائمة القتل فقط إذا دوره مافيا أو ما عندوش دور خاص
+    const adminRole = mState.myRole;
+    if (adminRole === 'mafia' || adminRole === 'citizen' || !adminRole) {
+      nightSelect.style.display = 'block';
+      const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && p.role !== 'mafia');
+      const sel = document.getElementById('m-mafia-target');
+      if (sel) sel.innerHTML = aliveNonMafia.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    } else {
+      nightSelect.style.display = 'none';
+    }
   } else if (nightSelect) {
     nightSelect.style.display = 'none';
   }
@@ -2157,7 +2163,7 @@ window.suggestMafiaTarget = async function() {
   }
 };
 
-
+window.setMafiaTarget = function() {
   const sel = document.getElementById('m-mafia-target');
   if (sel) { mState.mafiaTarget = sel.value; showToast('✅ تم تحديد الهدف'); }
 };
@@ -2704,13 +2710,13 @@ window.restartUCGame = async function() {
     ucState.players = resetPlayers;
     ucState.events = updates.events;
     const myData = wordReveal[ucState.playerId];
-    if (myData) { ucState.myWord = myData.word; ucState.isSpy = myData.isSpy; showUCWordReveal(); }
+    if (myData) { ucState.myWord = myData.word; ucState.isSpy = myData.isSpy; ucState.wordRevealed = true; showUCWordReveal(); }
     return;
   }
   await update(ref(db, `undercover/${ucState.roomCode}`), updates);
 };
 
-
+window.advanceUCPhase = async function() {
   const current = ucState.phase;
   let next, eventText, updates = {};
 
@@ -2892,7 +2898,7 @@ function showUCGameover(spyCaught, spyName) {
   const adminBtns = document.getElementById('uc-go-admin-btns');
   const playerMsg = document.getElementById('uc-go-player-msg');
   if (ucState.isAdmin) {
-    if (adminBtns) adminBtns.style.display = 'flex';
+    if (adminBtns) { adminBtns.style.cssText = 'width:100%;display:flex;flex-direction:column;gap:0.75rem;margin-top:0.5rem'; }
     if (playerMsg) playerMsg.style.display = 'none';
   } else {
     if (adminBtns) adminBtns.style.display = 'none';
