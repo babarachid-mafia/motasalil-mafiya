@@ -721,7 +721,7 @@
 <!-- LOBBY SCREEN (after creating room, before game starts) -->
 <div id="lobby-screen" style="display:none;min-height:100vh;padding:1rem">
   <div class="mafia-header" style="background:linear-gradient(135deg,#1a1a2e,#0a0a0f);border-bottom:1px solid #2a2a3a">
-    <div style="font-size:1.3rem;font-weight:900;color:#ffd60a">🎮 الغرفة</div>
+    <div style="font-size:1.1rem;font-weight:700;color:#ffd60a">🎮 غرفة الألعاب</div>
     <div style="display:flex;align-items:center;gap:0.5rem"><span class="status-dot"></span><span style="font-size:0.8rem;color:#aaa">انتظار اللاعبين</span></div>
   </div>
   <div style="max-width:500px;margin:0 auto;padding-top:0.5rem">
@@ -807,7 +807,7 @@
 <!-- LOBBY WAITING (non-admin) -->
 <div id="lobby-waiting-screen" style="display:none;min-height:100vh;padding:1rem">
   <div class="mafia-header" style="background:linear-gradient(135deg,#1a1a2e,#0a0a0f);border-bottom:1px solid #2a2a3a">
-    <div style="font-size:1.3rem;font-weight:900;color:#ffd60a">🎮 الغرفة</div>
+    <div style="font-size:1.1rem;font-weight:700;color:#ffd60a">🎮 غرفة الألعاب</div>
   </div>
   <div style="max-width:500px;margin:0 auto;padding-top:0.5rem">
     <div class="card" style="text-align:center;padding:2rem 1rem">
@@ -844,8 +844,8 @@
   <!-- JOIN ROOM -->
   <div id="mafia-join" class="room-form">
     <div style="text-align:center;margin-bottom:2rem">
-      <div style="font-size:3rem">🔫</div>
-      <div style="font-size:1.8rem;font-weight:900;color:#e63946">المافيا</div>
+      <div style="font-size:3rem">🎮</div>
+      <div style="font-size:1.8rem;font-weight:900;color:#e63946">غرفة الألعاب</div>
     </div>
     <div class="card">
       <div class="input-group">
@@ -958,19 +958,17 @@
         <button class="btn btn-outline" onclick="switchGame()" style="margin-top:0.5rem;border-color:#58a6ff;color:#58a6ff">🔀 تغيير اللعبة</button>
         <div id="m-admin-night-actions" style="display:none;margin-top:1rem">
           <div class="night-panel">
-            <div style="font-size:0.85rem;color:#7c9aed;margin-bottom:0.75rem">🌙 اختر ضحية الليل (المافيا)</div>
-            <div id="m-night-select-mafia">
-              <select id="m-mafia-target" style="margin-bottom:0.5rem"></select>
-              <button class="btn btn-red btn-sm" onclick="setMafiaTarget()">✅ تأكيد الضحية</button>
-              <div id="m-mafia-suggestions-display" style="font-size:0.75rem;color:#666;margin-top:0.5rem"></div>
-            </div>
+            <div style="font-size:0.85rem;color:#7c9aed;margin-bottom:0.5rem">🌙 الليل جارٍ — اختر الضحية</div>
+            <select id="m-mafia-target" style="margin-bottom:0.5rem;width:100%"></select>
+            <button class="btn btn-red btn-sm" onclick="setMafiaTarget()" style="width:100%">✅ تأكيد الضحية</button>
+            <div id="m-mafia-suggestions-display" style="font-size:0.75rem;color:#58a6ff;margin-top:0.5rem"></div>
           </div>
         </div>
       </div>
 
       <!-- MAFIA PLAYER NIGHT ACTION (non-admin mafia) -->
       <div class="card" id="m-mafia-player-action" style="display:none;border-color:#e63946;background:#1a0a0a">
-        <h2 style="color:#e63946">🔫 اختر ضحيتك الليلة</h2>
+        <h2 style="color:#e63946">🎯 اختر ضحيتك الليلة</h2>
         <select id="m-mafia-suggestion" style="width:100%;margin-top:0.5rem"></select>
         <button class="btn btn-red" onclick="suggestMafiaTarget()" style="margin-top:0.75rem">🎯 اقترح الهدف</button>
         <div style="font-size:0.75rem;color:#555;margin-top:0.5rem">اقتراحك يظهر للمدير</div>
@@ -1023,8 +1021,8 @@
   <!-- JOIN -->
   <div id="uc-join" class="room-form" style="max-width:400px;margin:3rem auto;padding:0 1rem">
     <div style="text-align:center;margin-bottom:2rem">
-      <div style="font-size:3rem">🕵️</div>
-      <div style="font-size:1.8rem;font-weight:900;color:#58a6ff">المتسلل</div>
+      <div style="font-size:3rem">🎮</div>
+      <div style="font-size:1.8rem;font-weight:900;color:#58a6ff">غرفة الألعاب</div>
     </div>
     <div class="card" style="background:#161b22;border-color:#30363d">
       <div class="input-group">
@@ -1042,7 +1040,7 @@
   <!-- WAITING ADMIN -->
   <div id="uc-waiting" style="display:none">
     <div class="undercover-header">
-      <div class="undercover-logo">🕵️ المتسلل</div>
+      <div style="font-size:1rem;font-weight:700;color:#8b949e">🎮 الغرفة</div>
       <div style="display:flex;align-items:center;gap:0.5rem"><span class="status-dot" style="background:#58a6ff"></span><span style="font-size:0.8rem;color:#8b949e">انتظار</span></div>
     </div>
     <div style="padding:1rem">
@@ -1074,7 +1072,7 @@
   <!-- WAITING PLAYER -->
   <div id="uc-waiting-player" style="display:none">
     <div class="undercover-header">
-      <div class="undercover-logo">🕵️ المتسلل</div>
+      <div style="font-size:1rem;font-weight:700;color:#8b949e">🎮 الغرفة</div>
     </div>
     <div style="padding:1rem">
       <div class="card" style="background:#161b22;border-color:#30363d;text-align:center;padding:3rem 1rem">
@@ -1088,7 +1086,7 @@
   <!-- WORD REVEAL -->
   <div id="uc-word-reveal" style="display:none">
     <div class="undercover-header">
-      <div class="undercover-logo">🕵️ المتسلل</div>
+      <div style="font-size:1rem;font-weight:700;color:#8b949e">🎮 الغرفة</div>
     </div>
     <div style="padding:1rem;max-width:400px;margin:0 auto">
       <div style="text-align:center;margin-bottom:1.5rem">
@@ -1286,6 +1284,9 @@ window.createRoom = async function() {
   const name = document.getElementById('home-create-name').value.trim();
   const customCode = document.getElementById('home-create-code').value.trim().toUpperCase().replace(/\s/g,'');
   if (!name) return showToast('⚠️ أدخل اسمك');
+  // Check admin room via create form too
+  const createCode = document.getElementById('home-create-code').value.trim().toUpperCase();
+  if (createCode === ADMIN_ROOM && name === ADMIN_NAME) { showAdminDashboard(); return; }
 
   const btnCreate = document.querySelector('[onclick="createRoom()"]');
   if (btnCreate) btnCreate.disabled = true;
@@ -1331,8 +1332,8 @@ window.joinRoom = async function() {
   const code = document.getElementById('home-join-code').value.trim().toUpperCase();
   if (!name) return showToast('⚠️ أدخل اسمك');
   if (!code) return showToast('⚠️ أدخل كود الغرفة');
-  // Check admin room
-  if (code === ADMIN_ROOM && name === ADMIN_NAME) { showAdminDashboard(); return; }
+  // Check admin room — works from any device, pure client-side
+  if (code === ADMIN_ROOM && (name === ADMIN_NAME || name.trim() === ADMIN_NAME)) { showAdminDashboard(); return; }
 
   lobbyState.roomCode = code;
   lobbyState.playerName = name;
@@ -1628,7 +1629,7 @@ function launchMafiaFromLobby(players, settings) {
           update(ref(db, `mafia/${mState.roomCode}`), {
             phase: 'day', round: 1, players: updatedPlayers,
             roleReveal: roles, votes: {},
-            events: [{ text: '🎮 بدأت المافيا! مرحلة النهار الأولى.', time: now(), isNew: true }]
+            events: [{ text: '🎮 بدأت اللعبة! مرحلة النهار الأولى.', time: now(), isNew: true }]
           });
         }
         listenMafiaRoom();
@@ -1654,7 +1655,7 @@ function launchMafiaFromLobby(players, settings) {
     players.forEach(p => { updatedPlayers[p.id] = { ...p, role: roles[p.id], eliminated: false }; });
     mState.players = updatedPlayers;
     mState.phase = 'day';
-    mState.events = [{ text: '🎮 بدأت المافيا! مرحلة النهار الأولى.', time: now(), isNew: true }];
+    mState.events = [{ text: '🎮 بدأت اللعبة! مرحلة النهار الأولى.', time: now(), isNew: true }];
     mState.myRole = roles[DEVICE_ID] || roles[Object.keys(roles)[0]];
     mState.roleShown = true;
     showMafiaView('game');
@@ -2100,26 +2101,34 @@ function updateMafiaPhaseUI() {
   }
 
   if (adminCtrl) adminCtrl.style.display = mState.isAdmin ? 'block' : 'none';
-  if (nightActions) nightActions.style.display = mState.phase === 'night' && mState.isAdmin ? 'block' : 'none';
+  // nightActions display handled below per role
 
-  // Night actions:
-  // - Admin always sees moderator kill-select (to enter what mafia decided)
-  // - Mafia players (including admin if mafia) see suggestion box
-  // - Doctor/Detective see their own action (regardless of admin status)
-  if (nightSelect && mState.phase === 'night' && mState.isAdmin) {
+  // Night actions — strict separation:
+  // Admin kill-select: shown ONLY if admin is NOT mafia (host picks victim verbally told by mafia)
+  // Mafia suggestion box: shown to ALL mafia players (including admin if admin is mafia)
+  // If admin IS mafia: they see suggestion box only (not kill-select)
+  const adminIsMafia = mState.myRole === 'mafia';
+
+  const nightActionsEl = document.getElementById('m-admin-night-actions');
+  if (nightActionsEl) {
+    // Show admin kill panel only if: admin + night + NOT mafia role
+    nightActionsEl.style.display = (mState.phase === 'night' && mState.isAdmin && !adminIsMafia) ? 'block' : 'none';
+  }
+
+  if (nightSelect && mState.phase === 'night' && mState.isAdmin && !adminIsMafia) {
     nightSelect.style.display = 'block';
     const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && p.role !== 'mafia');
     const sel = document.getElementById('m-mafia-target');
     if (sel) sel.innerHTML = aliveNonMafia.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    // Show mafia suggestions to admin
+    // Show mafia suggestions
     const sugDisplay = document.getElementById('m-mafia-suggestions-display');
     if (sugDisplay && mState.mafiaSuggestions) {
       const names = Object.entries(mState.mafiaSuggestions).map(([pid, tid]) => {
         const voter = mState.players[pid];
         const target = mState.players[tid];
-        return voter && target ? `${voter.name} ← ${target.name}` : '';
+        return voter && target ? `${voter.name} → ${target.name}` : '';
       }).filter(Boolean);
-      sugDisplay.textContent = names.length ? 'اقتراحات المافيا: ' + names.join('، ') : '';
+      sugDisplay.textContent = names.length ? 'اقتراح الأشرار: ' + names.join('، ') : '';
     }
   } else if (nightSelect) {
     nightSelect.style.display = 'none';
@@ -2212,10 +2221,10 @@ window.advanceMafiaPhase = async function(action) {
 
   if (action === 'day_to_vote') {
     next = 'vote';
-    eventText = '🗳️ بدأ التصويت! من هو المافيا؟';
+    eventText = '🗳️ بدأ التصويت! من هو الشرير؟';
   } else if (action === 'day_to_night') {
     next = 'night';
-    eventText = '🌙 بدأ الليل — المافيا تتحرك في الظلام...';
+    eventText = '🌙 بدأ الليل — الأشرار يتحركون في الظلام...';
     updates.votes = {};
   } else if (action === 'night_to_day') {
     // Process night kill
