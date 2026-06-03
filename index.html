@@ -767,11 +767,11 @@
         </div>
         <div class="settings-row">
           <div><div class="settings-label">المحقق</div></div>
-          <div class="toggle" id="lobby-toggle-detective" onclick="toggleSetting(this)"></div>
+          <div class="toggle on" id="lobby-toggle-detective" onclick="toggleSetting(this)"></div>
         </div>
         <div class="settings-row">
           <div><div class="settings-label">الطبيب</div></div>
-          <div class="toggle" id="lobby-toggle-doctor" onclick="toggleSetting(this)"></div>
+          <div class="toggle on" id="lobby-toggle-doctor" onclick="toggleSetting(this)"></div>
         </div>
       </div>
 
@@ -885,18 +885,19 @@
         </div>
         <div class="settings-row">
           <div><div class="settings-label">المحقق</div><div class="settings-sub">يعرف هوية لاعب كل ليلة</div></div>
-          <div class="toggle" id="m-toggle-detective" onclick="toggleSetting(this)"></div>
+          <div class="toggle on" id="m-toggle-detective" onclick="toggleSetting(this)"></div>
         </div>
         <div class="settings-row">
           <div><div class="settings-label">الطبيب</div><div class="settings-sub">يحمي لاعبًا كل ليلة</div></div>
-          <div class="toggle" id="m-toggle-doctor" onclick="toggleSetting(this)"></div>
+          <div class="toggle on" id="m-toggle-doctor" onclick="toggleSetting(this)"></div>
         </div>
       </div>
       <div class="card">
         <h2>👥 اللاعبين المنضمين (<span id="m-player-count">0</span>)</h2>
         <div class="waiting-players" id="m-waiting-players"></div>
       </div>
-      <button class="big-btn red" onclick="startMafiaGame()" id="m-start-btn" disabled>▶️ ابدأ اللعبة</button>
+      <button class="big-btn red" onclick="distributeRoles()" id="m-distribute-btn" disabled>🃏 وزّع الأدوار</button>
+      <button class="big-btn red" onclick="startMafiaDay()" id="m-start-btn" style="display:none;margin-top:0.5rem">☀️ ابدأ النهار</button>
     </div>
   </div>
 
@@ -958,10 +959,11 @@
         <button class="btn btn-outline" onclick="switchGame()" style="margin-top:0.5rem;border-color:#58a6ff;color:#58a6ff">🔀 تغيير اللعبة</button>
         <div id="m-admin-night-actions" style="display:none;margin-top:1rem">
           <div class="night-panel">
-            <div style="font-size:0.85rem;color:#7c9aed;margin-bottom:0.5rem">🌙 الليل جارٍ — اختر الضحية</div>
+            <div style="font-size:0.85rem;color:#7c9aed;margin-bottom:0.5rem">🌙 الليل جارٍ</div>
+            <div id="m-mafia-suggestions-display" style="font-size:0.8rem;color:#58a6ff;margin-bottom:0.75rem;min-height:1.5rem"></div>
+            <div style="font-size:0.75rem;color:#555;margin-bottom:0.5rem">عندما تنتهي المافيا، اختر الضحية:</div>
             <select id="m-mafia-target" style="margin-bottom:0.5rem;width:100%"></select>
-            <button class="btn btn-red btn-sm" onclick="setMafiaTarget()" style="width:100%">✅ تأكيد الضحية</button>
-            <div id="m-mafia-suggestions-display" style="font-size:0.75rem;color:#58a6ff;margin-top:0.5rem"></div>
+            <button class="btn btn-red btn-sm" onclick="setMafiaTarget()" style="width:100%">✅ تأكيد الضحية وأنهِ الليل</button>
           </div>
         </div>
       </div>
@@ -1617,25 +1619,25 @@ function launchMafiaFromLobby(players, settings) {
   mState.isAdmin = lobbyState.isAdmin;
 
   if (!demoMode) {
-    // For non-admin: just listen and rejoin
-    // For admin: set up game if not already started
     if (mState.isAdmin) {
       get(ref(db, `mafia/${mState.roomCode}/phase`)).then(snap => {
-        if (!snap.exists() || snap.val() === 'waiting') {
-          // First time — assign roles and start
-          const roles = assignMafiaRoles(players, settings);
-          const updatedPlayers = {};
-          players.forEach(p => { updatedPlayers[p.id] = { ...p, role: roles[p.id], eliminated: false }; });
+        const phase = snap.exists() ? snap.val() : 'waiting';
+        if (phase === 'waiting') {
+          // First time — just initialize with players, NO role assignment yet
+          const initPlayers = {};
+          players.forEach(p => { initPlayers[p.id] = { ...p, eliminated: false }; });
           update(ref(db, `mafia/${mState.roomCode}`), {
-            phase: 'day', round: 1, players: updatedPlayers,
-            roleReveal: roles, votes: {},
-            events: [{ text: '🎮 بدأت اللعبة! مرحلة النهار الأولى.', time: now(), isNew: true }]
+            phase: 'waiting',
+            round: 1,
+            players: initPlayers,
+            votes: {},
+            events: [{ text: '👋 مرحبًا بالجميع! انتظروا المدير لتوزيع الأدوار.', time: now(), isNew: true }]
           });
         }
         listenMafiaRoom();
       });
     } else {
-      // Register player in mafia room (won't overwrite role if already assigned)
+      // Register player without role
       get(ref(db, `mafia/${mState.roomCode}/players/${DEVICE_ID}`)).then(snap => {
         if (!snap.exists()) {
           update(ref(db, `mafia/${mState.roomCode}/players`), {
@@ -1645,21 +1647,15 @@ function launchMafiaFromLobby(players, settings) {
         listenMafiaRoom();
       });
     }
-    showMafiaView('game'); // will update on first listen
+    showMafiaView('game');
   } else {
-    // Demo mode
+    // Demo mode — show waiting state first
     mState.players = {};
     players.forEach(p => { mState.players[p.id] = { ...p, eliminated: false }; });
-    const roles = assignMafiaRoles(players, settings);
-    const updatedPlayers = {};
-    players.forEach(p => { updatedPlayers[p.id] = { ...p, role: roles[p.id], eliminated: false }; });
-    mState.players = updatedPlayers;
-    mState.phase = 'day';
-    mState.events = [{ text: '🎮 بدأت اللعبة! مرحلة النهار الأولى.', time: now(), isNew: true }];
-    mState.myRole = roles[DEVICE_ID] || roles[Object.keys(roles)[0]];
-    mState.roleShown = true;
+    mState.phase = 'waiting';
+    mState.events = [{ text: '👋 مرحبًا بالجميع! انتظروا المدير لتوزيع الأدوار.', time: now(), isNew: true }];
+    mState.myRole = null;
     showMafiaView('game');
-    showRoleReveal(mState.myRole);
     renderMafiaPlayers();
     renderMafiaEvents();
     updateMafiaPhaseUI();
@@ -1933,6 +1929,15 @@ function listenMafiaRoom() {
     mState.votes = data.votes || {};
     mState.round = data.round || 1;
     mState.mafiaSuggestions = data.mafiaSuggestions || {};
+    // When roles are assigned, show role reveal to this player
+    if (data.phase === 'roles_assigned' && data.roleReveal && !mState.roleShown) {
+      const myRole = data.roleReveal[mState.playerId];
+      if (myRole) { mState.myRole = myRole; mState.roleShown = true; showRoleReveal(myRole); }
+    }
+    // On phase change back to day (admin started), make sure UI updates
+    if (data.phase === 'day' && !mState.myRole && data.players && data.players[mState.playerId]) {
+      mState.myRole = data.players[mState.playerId].role;
+    }
 
     if (data.phase === 'waiting') {
       updateMafiaWaiting();
@@ -2009,47 +2014,67 @@ function assignMafiaRoles(players, settings) {
   return roles;
 }
 
-window.startMafiaGame = async function() {
+// Step 1: Admin distributes roles — players see their role, game not started yet
+window.distributeRoles = async function() {
   const players = Object.values(mState.players || {});
   if (players.length < 4) return showToast('⚠️ تحتاج على الأقل 4 لاعبين');
 
   const settings = {
-    mafiaCount: document.getElementById('m-mafia-count').value,
+    mafiaCount: parseInt(document.getElementById('m-mafia-count').value) || 1,
     detective: document.getElementById('m-toggle-detective').classList.contains('on'),
     doctor: document.getElementById('m-toggle-doctor').classList.contains('on')
   };
 
   const roles = assignMafiaRoles(players, settings);
   const updatedPlayers = {};
-  players.forEach(p => {
-    updatedPlayers[p.id] = { ...p, role: roles[p.id], eliminated: false };
-  });
+  players.forEach(p => { updatedPlayers[p.id] = { ...p, role: roles[p.id], eliminated: false }; });
 
-  const updates = {
-    phase: 'day',
+  if (demoMode) {
+    mState.players = updatedPlayers;
+    mState.phase = 'roles_assigned';
+    mState.myRole = roles[mState.playerId];
+    mState.roleShown = false;
+    showMafiaView('game');
+    showRoleReveal(mState.myRole);
+    renderMafiaPlayers();
+    updateMafiaPhaseUI();
+    // Show "ابدأ النهار" button
+    const distBtn = document.getElementById('m-distribute-btn');
+    const startBtn = document.getElementById('m-start-btn');
+    if (distBtn) distBtn.style.display = 'none';
+    if (startBtn) startBtn.style.display = 'block';
+    return;
+  }
+
+  await update(ref(db, `mafia/${mState.roomCode}`), {
+    phase: 'roles_assigned',
     round: 1,
     players: updatedPlayers,
     roleReveal: roles,
     votes: {},
-    events: [{ text: '🎮 بدأت اللعبة! مرحلة النهار الأولى.', time: now(), isNew: true }]
-  };
+    events: [{ text: '🃏 تم توزيع الأدوار — انتظر المدير للبدء!', time: now(), isNew: true }]
+  });
+};
 
+// Step 2: Admin starts the day phase
+window.startMafiaDay = async function() {
   if (demoMode) {
-    mState.players = updatedPlayers;
     mState.phase = 'day';
-    mState.events = updates.events;
-    mState.myRole = roles[mState.playerId];
-    mState.roleShown = true;
+    mState.events = [{ text: '☀️ بدأت اللعبة! مرحلة النهار الأولى.', time: now(), isNew: true }];
     showMafiaView('game');
-    showRoleReveal(mState.myRole);
     renderMafiaPlayers();
     renderMafiaEvents();
     updateMafiaPhaseUI();
     return;
   }
-
-  await update(ref(db, `mafia/${mState.roomCode}`), updates);
+  await update(ref(db, `mafia/${mState.roomCode}`), {
+    phase: 'day',
+    events: [{ text: '☀️ بدأت اللعبة! مرحلة النهار الأولى.', time: now(), isNew: true }]
+  });
 };
+
+// Legacy alias kept for compatibility
+window.startMafiaGame = window.distributeRoles;
 
 function showRoleReveal(role) {
   const r = MAFIA_ROLES[role] || MAFIA_ROLES.citizen;
@@ -2103,43 +2128,46 @@ function updateMafiaPhaseUI() {
   if (adminCtrl) adminCtrl.style.display = mState.isAdmin ? 'block' : 'none';
   // nightActions display handled below per role
 
-  // Night actions — strict separation:
-  // Admin kill-select: shown ONLY if admin is NOT mafia (host picks victim verbally told by mafia)
-  // Mafia suggestion box: shown to ALL mafia players (including admin if admin is mafia)
-  // If admin IS mafia: they see suggestion box only (not kill-select)
-  const adminIsMafia = mState.myRole === 'mafia';
+  // Night actions — STRICT rules:
+  // - ONLY mafia players see the suggestion/kill box (including admin IF their role is mafia)
+  // - Admin who is NOT mafia: sees the "confirm victim" panel (host role: record mafia decision)
+  // - Doctor/Detective: see their own action box only
+  const amMafia = mState.myRole === 'mafia';
+  const isNightPhase = mState.phase === 'night';
 
+  // Admin host panel (only when admin is NOT mafia)
   const nightActionsEl = document.getElementById('m-admin-night-actions');
   if (nightActionsEl) {
-    // Show admin kill panel only if: admin + night + NOT mafia role
-    nightActionsEl.style.display = (mState.phase === 'night' && mState.isAdmin && !adminIsMafia) ? 'block' : 'none';
-  }
-
-  if (nightSelect && mState.phase === 'night' && mState.isAdmin && !adminIsMafia) {
-    nightSelect.style.display = 'block';
-    const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && p.role !== 'mafia');
-    const sel = document.getElementById('m-mafia-target');
-    if (sel) sel.innerHTML = aliveNonMafia.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-    // Show mafia suggestions
-    const sugDisplay = document.getElementById('m-mafia-suggestions-display');
-    if (sugDisplay && mState.mafiaSuggestions) {
-      const names = Object.entries(mState.mafiaSuggestions).map(([pid, tid]) => {
-        const voter = mState.players[pid];
-        const target = mState.players[tid];
-        return voter && target ? `${voter.name} → ${target.name}` : '';
-      }).filter(Boolean);
-      sugDisplay.textContent = names.length ? 'اقتراح الأشرار: ' + names.join('، ') : '';
+    nightActionsEl.style.display = (isNightPhase && mState.isAdmin && !amMafia) ? 'block' : 'none';
+    if (isNightPhase && mState.isAdmin && !amMafia) {
+      // Populate victim select
+      const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && p.role !== 'mafia');
+      const sel = document.getElementById('m-mafia-target');
+      if (sel) sel.innerHTML = aliveNonMafia.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+      // Show mafia suggestions
+      const sugDisplay = document.getElementById('m-mafia-suggestions-display');
+      if (sugDisplay) {
+        if (mState.mafiaSuggestions && Object.keys(mState.mafiaSuggestions).length) {
+          const names = Object.entries(mState.mafiaSuggestions).map(([pid, tid]) => {
+            const voter = mState.players[pid];
+            const target = mState.players[tid];
+            return voter && target ? `${voter.name} → ${target.name}` : '';
+          }).filter(Boolean);
+          sugDisplay.textContent = names.length ? '📨 اقتراح المافيا: ' + names.join('، ') : '';
+        } else {
+          sugDisplay.textContent = '⏳ في انتظار اقتراح المافيا...';
+        }
+      }
     }
-  } else if (nightSelect) {
-    nightSelect.style.display = 'none';
   }
 
-  // Mafia suggestion box: ALL mafia players see it (including admin if mafia)
+  // Hide old nightSelect (replaced by nightActionsEl logic above)
+  if (nightSelect) nightSelect.style.display = 'none';
+
+  // Mafia action: ONLY mafia players (role === mafia), regardless of admin status
   const mafiaActionDiv = document.getElementById('m-mafia-player-action');
   if (mafiaActionDiv) {
-    const isMafia = mState.myRole === 'mafia';
-    const isNight = mState.phase === 'night';
-    if (isMafia && isNight) {
+    if (amMafia && isNightPhase) {
       mafiaActionDiv.style.display = 'block';
       const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && p.role !== 'mafia');
       const sel = document.getElementById('m-mafia-suggestion');
