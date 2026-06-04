@@ -2009,18 +2009,33 @@ function showMafiaView(view) {
 }
 
 function assignMafiaRoles(players, settings) {
-  const ids = players.map(p => p.id);
-  const shuffled = [...ids].sort(() => Math.random() - 0.5);
-  const count = ids.length;
-  const mafiaCount = settings.mafiaCount === 'auto' ? (count >= 8 ? 2 : 1) : parseInt(settings.mafiaCount);
-  const roles = {};
+  const count = players.length;
 
-  for (let i = 0; i < shuffled.length; i++) {
-    if (i < mafiaCount) roles[shuffled[i]] = 'mafia';
-    else if (i === mafiaCount && settings.detective) roles[shuffled[i]] = 'detective';
-    else if (i === mafiaCount + (settings.detective ? 1 : 0) && settings.doctor) roles[shuffled[i]] = 'doctor';
-    else roles[shuffled[i]] = 'citizen';
+  // حساب عدد المافيا
+  let mafiaCount;
+  const rawCount = settings.mafiaCount;
+  if (rawCount === 'auto' || rawCount === null || rawCount === undefined) {
+    mafiaCount = count >= 8 ? 2 : 1;
+  } else {
+    mafiaCount = parseInt(rawCount) || 1;
   }
+  // دائماً على الأقل 1 مافيا، ولا يتجاوز نصف اللاعبين
+  mafiaCount = Math.max(1, Math.min(mafiaCount, Math.floor(count / 2)));
+
+  // بناء قائمة الأدوار المطلوبة
+  const roleList = [];
+  for (let i = 0; i < mafiaCount; i++) roleList.push('mafia');
+  if (settings.detective) roleList.push('detective');
+  if (settings.doctor) roleList.push('doctor');
+  while (roleList.length < count) roleList.push('citizen');
+
+  // خلط عشوائي للأدوار واللاعبين
+  const shuffledRoles = roleList.sort(() => Math.random() - 0.5);
+  const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
+
+  // توزيع الأدوار
+  const roles = {};
+  shuffledPlayers.forEach((p, i) => { roles[p.id] = shuffledRoles[i]; });
   return roles;
 }
 
@@ -2030,7 +2045,7 @@ window.distributeRoles = async function() {
   if (players.length < 4) return showToast('⚠️ تحتاج على الأقل 4 لاعبين');
 
   const settings = {
-    mafiaCount: parseInt(document.getElementById('m-mafia-count').value) || 1,
+    mafiaCount: document.getElementById('m-mafia-count').value,
     detective: document.getElementById('m-toggle-detective').classList.contains('on'),
     doctor: document.getElementById('m-toggle-doctor').classList.contains('on')
   };
