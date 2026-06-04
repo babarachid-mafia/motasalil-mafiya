@@ -683,26 +683,8 @@
   <div class="home-title">🎮 ألعاب الأصدقاء</div>
   <div class="home-subtitle">أنشئ غرفة أو انضم لغرفة موجودة</div>
 
-  <!-- Create Room -->
+  <!-- Join Room — فوق -->
   <div style="width:100%;max-width:380px;margin-bottom:1.5rem">
-    <div class="card" style="background:#13131a;border-color:#2a2a3a">
-      <h2 style="font-size:1rem;margin-bottom:1rem;color:#ffd60a">🆕 إنشاء غرفة جديدة</h2>
-      <div class="input-group">
-        <label>اسمك (المدير)</label>
-        <input id="home-create-name" placeholder="أدخل اسمك..." maxlength="15">
-      </div>
-      <div class="input-group">
-        <label>كود الغرفة (اختياري — سيتولد تلقائياً)</label>
-        <input id="home-create-code" placeholder="اكتب كوداً أو اتركه فارغاً" maxlength="8" style="text-transform:uppercase;letter-spacing:0.15em">
-      </div>
-      <button class="big-btn red" onclick="createRoom()" style="margin-bottom:0">🚪 إنشاء غرفة</button>
-    </div>
-  </div>
-
-  <div style="color:#444;font-size:0.85rem;margin-bottom:1.5rem">— أو —</div>
-
-  <!-- Join Room -->
-  <div style="width:100%;max-width:380px">
     <div class="card" style="background:#13131a;border-color:#2a2a3a">
       <h2 style="font-size:1rem;margin-bottom:1rem;color:#58a6ff">🔗 الانضمام لغرفة</h2>
       <div class="input-group">
@@ -714,6 +696,24 @@
         <input id="home-join-code" placeholder="XXXX" maxlength="6" style="text-transform:uppercase;letter-spacing:0.2em">
       </div>
       <button class="big-btn blue" onclick="joinRoom()" style="margin-bottom:0">🚀 انضم</button>
+    </div>
+  </div>
+
+  <div style="color:#444;font-size:0.85rem;margin-bottom:1.5rem">— أو —</div>
+
+  <!-- Create Room — تحت -->
+  <div style="width:100%;max-width:380px">
+    <div class="card" style="background:#13131a;border-color:#2a2a3a">
+      <h2 style="font-size:1rem;margin-bottom:1rem;color:#ffd60a">🆕 إنشاء غرفة جديدة</h2>
+      <div class="input-group">
+        <label>اسمك (المدير)</label>
+        <input id="home-create-name" placeholder="أدخل اسمك..." maxlength="15">
+      </div>
+      <div class="input-group">
+        <label>كود الغرفة (اختياري — سيتولد تلقائياً)</label>
+        <input id="home-create-code" placeholder="اكتب كوداً أو اتركه فارغاً" maxlength="8" style="text-transform:uppercase;letter-spacing:0.15em">
+      </div>
+      <button class="big-btn red" onclick="createRoom()" style="margin-bottom:0">🚪 إنشاء غرفة</button>
     </div>
   </div>
 </div>
@@ -1975,6 +1975,9 @@ function updateMafiaWaiting() {
       `<div class="waiting-player-chip"><span class="status-dot"></span>${p.name}</div>`
     ).join('');
   }
+
+  const distributeBtn = document.getElementById('m-distribute-btn');
+  if (distributeBtn) distributeBtn.disabled = count < 4;
 
   const startBtn = document.getElementById('m-start-btn');
   if (startBtn) startBtn.disabled = count < 4;
