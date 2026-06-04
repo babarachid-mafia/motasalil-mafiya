@@ -1153,6 +1153,17 @@
 
 </div>
 
+<!-- UC ELIMINATION ANNOUNCEMENT -->
+<div class="gameover-overlay" id="uc-elim-announce" style="display:none">
+  <div class="gameover-card" style="border-color:#58a6ff;box-shadow:0 0 60px rgba(88,166,255,0.2)">
+    <div class="gameover-emoji" id="uc-elim-emoji">⚖️</div>
+    <div class="gameover-title" id="uc-elim-name" style="color:#e6edf3;font-size:1.4rem">تم إقصاء فلان</div>
+    <div id="uc-elim-role-line" style="margin:1rem 0;font-size:1.1rem;font-weight:700"></div>
+    <div id="uc-elim-desc" style="color:#8b949e;font-size:0.9rem;margin-bottom:1rem"></div>
+    <div id="uc-elim-continue-area"></div>
+  </div>
+</div>
+
 <!-- UC GAME OVER -->
 <div class="gameover-overlay" id="uc-gameover">
   <div class="gameover-card" style="border-color:#58a6ff;box-shadow:0 0 60px rgba(88,166,255,0.2)">
@@ -2109,7 +2120,11 @@ function updateMafiaPhaseUI() {
   const myNight = document.getElementById('m-my-night-action');
   const phaseButtons = document.getElementById('m-phase-buttons');
 
-  if (mState.phase === 'day') {
+  if (mState.phase === 'roles_assigned') {
+    if (badge) { badge.className = 'phase-badge day'; badge.textContent = '🃏 الأدوار وُزِّعت'; }
+    if (phaseButtons) phaseButtons.innerHTML = `
+      <button class="btn btn-red" onclick="startMafiaDay()">☀️ ابدأ النهار</button>`;
+  } else if (mState.phase === 'day') {
     if (badge) { badge.className = 'phase-badge day'; badge.textContent = '☀️ النهار'; }
     if (phaseButtons) phaseButtons.innerHTML = `
       <button class="btn btn-gold" onclick="advanceMafiaPhase('day_to_vote')">🗳️ بدأ التصويت</button>
@@ -2450,10 +2465,13 @@ function renderUCPlayers() {
     const myVote = ucState.votes[ucState.playerId] === p.id;
     const voteCount = Object.values(ucState.votes || {}).filter(v => v === p.id).length;
 
+    const elimRole = eliminated && p.revealedRole ? (p.revealedRole === 'spy' ? '🕵️ متسلل' : '👤 عادي') : '';
+    const nameStyle = eliminated ? 'text-decoration:line-through;color:#555' : 'font-weight:700;color:var(--undercover-text)';
     return `<div class="undercover-player-item ${eliminated ? 'eliminated' : ''} ${myVote ? 'voted' : ''}">
-      <div style="display:flex;align-items:center;gap:0.5rem">
-        <span style="font-weight:700;color:var(--undercover-text)">${p.name}${p.id === ucState.playerId ? ' (أنت)' : ''}</span>
-        ${eliminated ? '<span class="tag" style="background:#1c2128;color:#8b949e;font-size:0.7rem">مقصى</span>' : ''}
+      <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">
+        <span style="${nameStyle}">${p.name}${p.id === ucState.playerId ? ' (أنت)' : ''}</span>
+        ${eliminated && elimRole ? `<span class="tag" style="background:#1c2128;border:1px solid #30363d;color:${p.revealedRole==='spy'?'#f85149':'#3fb950'};font-size:0.72rem;padding:0.15rem 0.5rem;border-radius:6px">${elimRole}</span>` : ''}
+        ${eliminated && !elimRole ? '<span class="tag" style="background:#1c2128;color:#8b949e;font-size:0.7rem">مقصى</span>' : ''}
         ${voteCount > 0 ? `<span style="color:#f85149;font-size:0.75rem">🗳️${voteCount}</span>` : ''}
       </div>
       ${isVote && !eliminated && p.id !== ucState.playerId ?
@@ -2524,9 +2542,11 @@ function listenUCRoom() {
     if (data.phase === 'waiting') {
       updateUCWaiting();
     } else if (data.phase === 'reveal') {
-      // Close gameover if open (new round started)
+      // Close announcement overlays if open (new round started)
       const go = document.getElementById('uc-gameover');
       if (go) go.style.display = 'none';
+      const ea = document.getElementById('uc-elim-announce');
+      if (ea) ea.style.display = 'none';
 
       const myData = data.wordReveal?.[ucState.playerId];
       const alreadySeen = data.seenReveal?.[ucState.playerId];
@@ -2789,7 +2809,7 @@ window.advanceUCPhase = async function() {
     }
 
   } else if (current === 'vote') {
-    // Process votes → eliminate most voted → start new round automatically
+    // Process votes → eliminate most voted → show announcement overlay → then continue
     const voteCounts = {};
     Object.values(ucState.votes || {}).forEach(v => { if(v) voteCounts[v] = (voteCounts[v] || 0) + 1; });
     const sorted = Object.entries(voteCounts).sort((a,b) => b[1]-a[1]);
@@ -2804,42 +2824,59 @@ window.advanceUCPhase = async function() {
       if (topPlayer) {
         eliminatedName = topPlayer.name;
         spyCaught = (ucState.spyId && eliminatedId === ucState.spyId) || topPlayer.isSpy;
-        // Mark eliminated
+        const revealedRole = spyCaught ? 'spy' : 'normal';
+        // Mark eliminated and store revealed role
         if (!demoMode) {
-          await update(ref(db, `undercover/${ucState.roomCode}/players/${eliminatedId}`), { eliminated: true });
+          await update(ref(db, `undercover/${ucState.roomCode}/players/${eliminatedId}`), { eliminated: true, revealedRole });
         } else {
           ucState.players[eliminatedId].eliminated = true;
+          ucState.players[eliminatedId].revealedRole = revealedRole;
         }
       }
     }
 
+    // Compute aftermath
+    const alivePlayers = Object.values(ucState.players).filter(p => !p.eliminated && p.id !== eliminatedId);
+    const aliveNonSpy = alivePlayers.filter(p => p.id !== ucState.spyId);
+    const gameOver = spyCaught || aliveNonSpy.length <= 1;
+
+    // Determine next action
+    let nextAction;
+    let eventText;
     if (spyCaught) {
       eventText = `🎯 تم إقصاء المتسلل ${eliminatedName}! فاز الفريق! 🎉`;
-      const evts = [{ text: eventText, time: now(), isNew: true }, ...ucState.events].slice(0,5);
-      if (demoMode) { ucState.events = evts; renderUCEvents(); }
-      else await update(ref(db, `undercover/${ucState.roomCode}/events`), Object.fromEntries(evts.map((e,i)=>[i,e])));
-      showUCGameover(true, eliminatedName);
-    } else {
-      // Count alive (after elimination)
-      const alivePlayers = Object.values(ucState.players).filter(p => !p.eliminated && p.id !== eliminatedId);
-      const aliveNonSpy = alivePlayers.filter(p => p.id !== ucState.spyId);
-      // Spy wins when only 1 non-spy left (spy vs 1 player)
-      if (aliveNonSpy.length <= 1) {
-        eventText = eliminatedId
-          ? `❌ تم إقصاء ${eliminatedName} — لم يكن المتسلل! فاز المتسلل 🕵️`
-          : '🕵️ لا أحد صوّت — فاز المتسلل!';
+      nextAction = () => {
         const evts = [{ text: eventText, time: now(), isNew: true }, ...ucState.events].slice(0,5);
-        if (demoMode) { ucState.events = evts; renderUCEvents(); }
-        else await update(ref(db, `undercover/${ucState.roomCode}/events`), Object.fromEntries(evts.map((e,i)=>[i,e])));
+        if (demoMode) { ucState.events = evts; renderUCEvents(); } else {
+          update(ref(db, `undercover/${ucState.roomCode}/events`), Object.fromEntries(evts.map((e,i)=>[i,e])));
+        }
+        showUCGameover(true, eliminatedName);
+      };
+    } else if (aliveNonSpy.length <= 1) {
+      eventText = eliminatedId
+        ? `❌ تم إقصاء ${eliminatedName} — لم يكن المتسلل! فاز المتسلل 🕵️`
+        : '🕵️ لا أحد صوّت — فاز المتسلل!';
+      nextAction = () => {
+        const evts = [{ text: eventText, time: now(), isNew: true }, ...ucState.events].slice(0,5);
+        if (demoMode) { ucState.events = evts; renderUCEvents(); } else {
+          update(ref(db, `undercover/${ucState.roomCode}/events`), Object.fromEntries(evts.map((e,i)=>[i,e])));
+        }
         showUCGameover(false, '');
-      } else {
-        // Continue: new round with remaining players
-        eventText = eliminatedId
-          ? `❌ تم إقصاء ${eliminatedName} — لم يكن المتسلل! جولة جديدة...`
-          : '🤷 لا أحد صوّت — جولة جديدة!';
-        await startNewUCRoundAuto(eventText);
-      }
+      };
+    } else {
+      eventText = eliminatedId
+        ? `❌ تم إقصاء ${eliminatedName} — لم يكن المتسلل! جولة جديدة...`
+        : '🤷 لا أحد صوّت — جولة جديدة!';
+      nextAction = () => startNewUCRoundAuto(eventText);
     }
+
+    // Show elimination announcement overlay before continuing
+    if (eliminatedId) {
+      showUCEliminationAnnounce(eliminatedName, spyCaught, nextAction, gameOver);
+    } else {
+      await nextAction();
+    }
+
   } else {
     // playing
     next = 'playing';
@@ -2934,6 +2971,48 @@ window.voteUC = async function(targetId) {
     }
   }
   renderUCPlayers();
+};
+
+function showUCEliminationAnnounce(eliminatedName, wasSpy, onContinue, isGameOver) {
+  renderUCPlayers(); // Update list with strikethrough first
+  const overlay = document.getElementById('uc-elim-announce');
+  const emojiEl = document.getElementById('uc-elim-emoji');
+  const nameEl = document.getElementById('uc-elim-name');
+  const roleEl = document.getElementById('uc-elim-role-line');
+  const descEl = document.getElementById('uc-elim-desc');
+  const continueArea = document.getElementById('uc-elim-continue-area');
+
+  emojiEl.textContent = wasSpy ? '🕵️' : '😇';
+  nameEl.textContent = `تم إقصاء ${eliminatedName}`;
+  if (wasSpy) {
+    roleEl.innerHTML = '<span style="color:#f85149">كان المتسلل! 🎯</span>';
+    descEl.textContent = 'أحسنتم! الفريق نجح في كشفه.';
+  } else {
+    roleEl.innerHTML = '<span style="color:#3fb950">لم يكن متسللاً 😅</span>';
+    descEl.textContent = isGameOver ? 'المتسلل نجح في البقاء مجهولاً...' : 'المتسلل لا يزال بينكم! تتمة الجولة...';
+  }
+
+  // Only admin sees continue button
+  if (ucState.isAdmin) {
+    continueArea.innerHTML = `<button class="big-btn blue" onclick="closeUCEliminationAnnounce()" style="margin-top:0.5rem">
+      ${isGameOver ? '🏆 عرض النتيجة' : '▶️ متابعة'}
+    </button>`;
+  } else {
+    continueArea.innerHTML = '<div style="color:#8b949e;font-size:0.9rem;margin-top:0.75rem">في انتظار المدير...</div>';
+  }
+
+  overlay.style.display = 'flex';
+
+  // Store callback for when admin clicks continue
+  overlay._onContinue = onContinue;
+}
+
+window.closeUCEliminationAnnounce = async function() {
+  const overlay = document.getElementById('uc-elim-announce');
+  const cb = overlay._onContinue;
+  overlay.style.display = 'none';
+  overlay._onContinue = null;
+  if (cb) await cb();
 };
 
 function showUCGameover(spyCaught, spyName) {
