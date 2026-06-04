@@ -1856,14 +1856,18 @@ function renderMafiaPlayers() {
   const players = Object.values(mState.players || {});
   grid.innerHTML = players.map(p => {
     const eliminated = p.eliminated;
-    const roleData = MAFIA_ROLES[p.role] || MAFIA_ROLES.citizen;
-    const showRole = p.id === mState.playerId || eliminated;
+    // فقط اللاعب نفسه يرى دوره، أو المقصيون يُكشف دورهم للجميع
+    // لا أحد يرى دور الآخرين ما لم يُقصوا
+    const isMe = p.id === mState.playerId;
+    const displayRole = isMe ? mState.myRole : (eliminated ? p.role : null);
+    const roleData = MAFIA_ROLES[displayRole] || MAFIA_ROLES.citizen;
+    const showRole = isMe || eliminated;
     const voteCount = Object.values(mState.votes || {}).filter(v => v === p.id).length;
     const myVote = mState.votes[mState.playerId] === p.id;
 
     return `<div class="player-item ${eliminated ? 'eliminated' : ''} ${myVote ? 'voted' : ''}">
-      <div class="player-name">${p.name}${p.id === mState.playerId ? ' (أنت)' : ''}</div>
-      ${showRole ? `<div class="player-role ${p.role}" style="color:${roleData.color}">${roleData.emoji} ${roleData.name}</div>` : ''}
+      <div class="player-name">${p.name}${isMe ? ' (أنت)' : ''}</div>
+      ${showRole && displayRole ? `<div class="player-role ${displayRole}" style="color:${roleData.color}">${roleData.emoji} ${roleData.name}</div>` : ''}
       ${voteCount > 0 ? `<div class="vote-count">🗳️ ${voteCount}</div>` : ''}
       ${isVotePhase && !eliminated && p.id !== mState.playerId ? 
         `<button class="vote-btn ${myVote ? 'voted' : ''}" onclick="voteMafia('${p.id}')">
@@ -1930,35 +1934,36 @@ function listenMafiaRoom() {
   onValue(roomRef, snap => {
     if (!snap.exists()) return;
     const data = snap.val();
-    mState.players = data.players || {};
     mState.phase = data.phase || 'waiting';
     mState.events = data.events ? (Array.isArray(data.events) ? data.events : Object.values(data.events)).slice(0, 5) : [];
     mState.votes = data.votes || {};
     mState.round = data.round || 1;
     mState.mafiaSuggestions = data.mafiaSuggestions || {};
-    // When roles are assigned, show role reveal to this player
-    if (data.phase === 'roles_assigned' && data.roleReveal && !mState.roleShown) {
-      const myRole = data.roleReveal[mState.playerId];
-      if (myRole) { mState.myRole = myRole; mState.roleShown = true; showRoleReveal(myRole); }
-    }
-    // On phase change back to day (admin started), make sure UI updates
-    if (data.phase === 'day' && !mState.myRole && data.players && data.players[mState.playerId]) {
-      mState.myRole = data.players[mState.playerId].role;
+
+    // دائماً طبّق roleReveal على players لضمان صحة الأدوار
+    const rawPlayers = data.players || {};
+    const roleReveal = data.roleReveal || {};
+    mState._roleReveal = roleReveal; // احتفظ بنسخة للاستخدام في العمليات الليلية
+    mState.players = {};
+    Object.values(rawPlayers).forEach(p => {
+      const correctRole = roleReveal[p.id] || p.role || 'citizen';
+      mState.players[p.id] = { ...p, role: correctRole };
+    });
+
+    // استخرج دور هذا الجهاز من roleReveal (المصدر الوحيد الموثوق)
+    const myCorrectRole = roleReveal[mState.playerId];
+    if (myCorrectRole) {
+      if (!mState.myRole) mState.myRole = myCorrectRole;
+      if (!mState.roleShown && (data.phase === 'roles_assigned' || data.phase === 'day')) {
+        mState.myRole = myCorrectRole;
+        mState.roleShown = true;
+        showRoleReveal(myCorrectRole);
+      }
     }
 
     if (data.phase === 'waiting') {
       updateMafiaWaiting();
     } else {
-      // Show role if not yet shown
-      if (data.roleReveal && data.roleReveal[DEVICE_ID] && !mState.roleShown) {
-        mState.myRole = data.roleReveal[DEVICE_ID];
-        mState.roleShown = true;
-        showRoleReveal(mState.myRole);
-      }
-      // Set myRole from existing data even on rejoin
-      if (data.roleReveal && data.roleReveal[DEVICE_ID] && !mState.myRole) {
-        mState.myRole = data.roleReveal[DEVICE_ID];
-      }
       showMafiaView('game');
       renderMafiaPlayers();
       renderMafiaEvents();
@@ -2167,7 +2172,7 @@ function updateMafiaPhaseUI() {
   // Admin night indicator: just show "night in progress" message, nothing actionable
   const nightActionsEl = document.getElementById('m-admin-night-actions');
   if (nightActionsEl) {
-    nightActionsEl.style.display = (isNightPhase && mState.isAdmin) ? 'block' : 'none';
+    nightActionsEl.style.display = (isNightPhase && mState.isAdmin && !amMafia) ? 'block' : 'none';
   }
 
   // Hide old nightSelect
@@ -2178,7 +2183,8 @@ function updateMafiaPhaseUI() {
   if (mafiaActionDiv) {
     if (amMafia && isNightPhase) {
       mafiaActionDiv.style.display = 'block';
-      const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && p.role !== 'mafia');
+      const roleRevealData = mState._roleReveal || {};
+      const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && (roleRevealData[p.id] || p.role) !== 'mafia');
       const sel = document.getElementById('m-mafia-suggestion');
       if (sel) sel.innerHTML = aliveNonMafia.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
     } else {
