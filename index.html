@@ -958,12 +958,8 @@
         <button class="btn btn-outline" onclick="newMafiaRound()" style="margin-top:0.75rem">🔄 جولة جديدة (إعادة توزيع الأدوار)</button>
         <button class="btn btn-outline" onclick="switchGame()" style="margin-top:0.5rem;border-color:#58a6ff;color:#58a6ff">🔀 تغيير اللعبة</button>
         <div id="m-admin-night-actions" style="display:none;margin-top:1rem">
-          <div class="night-panel">
-            <div style="font-size:0.85rem;color:#7c9aed;margin-bottom:0.5rem">🌙 الليل جارٍ</div>
-            <div id="m-mafia-suggestions-display" style="font-size:0.8rem;color:#58a6ff;margin-bottom:0.75rem;min-height:1.5rem"></div>
-            <div style="font-size:0.75rem;color:#555;margin-bottom:0.5rem">عندما تنتهي المافيا، اختر الضحية:</div>
-            <select id="m-mafia-target" style="margin-bottom:0.5rem;width:100%"></select>
-            <button class="btn btn-red btn-sm" onclick="setMafiaTarget()" style="width:100%">✅ تأكيد الضحية وأنهِ الليل</button>
+          <div class="night-panel" style="text-align:center;color:#555;font-size:0.85rem">
+            🌙 الليل جارٍ — انتظر حتى ينتهي اللاعبون من أعمالهم
           </div>
         </div>
       </div>
@@ -2129,42 +2125,22 @@ function updateMafiaPhaseUI() {
   // nightActions display handled below per role
 
   // Night actions — STRICT rules:
-  // - ONLY mafia players see the suggestion/kill box (including admin IF their role is mafia)
-  // - Admin who is NOT mafia: sees the "confirm victim" panel (host role: record mafia decision)
-  // - Doctor/Detective: see their own action box only
+  // - ONLY mafia role players see the kill suggestion box
+  // - Admin sees NOTHING special at night unless their role is mafia
+  // - Doctor/Detective see only their own action box
   const amMafia = mState.myRole === 'mafia';
   const isNightPhase = mState.phase === 'night';
 
-  // Admin host panel (only when admin is NOT mafia)
+  // Admin night indicator: just show "night in progress" message, nothing actionable
   const nightActionsEl = document.getElementById('m-admin-night-actions');
   if (nightActionsEl) {
-    nightActionsEl.style.display = (isNightPhase && mState.isAdmin && !amMafia) ? 'block' : 'none';
-    if (isNightPhase && mState.isAdmin && !amMafia) {
-      // Populate victim select
-      const aliveNonMafia = Object.values(mState.players).filter(p => !p.eliminated && p.role !== 'mafia');
-      const sel = document.getElementById('m-mafia-target');
-      if (sel) sel.innerHTML = aliveNonMafia.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-      // Show mafia suggestions
-      const sugDisplay = document.getElementById('m-mafia-suggestions-display');
-      if (sugDisplay) {
-        if (mState.mafiaSuggestions && Object.keys(mState.mafiaSuggestions).length) {
-          const names = Object.entries(mState.mafiaSuggestions).map(([pid, tid]) => {
-            const voter = mState.players[pid];
-            const target = mState.players[tid];
-            return voter && target ? `${voter.name} → ${target.name}` : '';
-          }).filter(Boolean);
-          sugDisplay.textContent = names.length ? '📨 اقتراح المافيا: ' + names.join('، ') : '';
-        } else {
-          sugDisplay.textContent = '⏳ في انتظار اقتراح المافيا...';
-        }
-      }
-    }
+    nightActionsEl.style.display = (isNightPhase && mState.isAdmin) ? 'block' : 'none';
   }
 
-  // Hide old nightSelect (replaced by nightActionsEl logic above)
+  // Hide old nightSelect
   if (nightSelect) nightSelect.style.display = 'none';
 
-  // Mafia action: ONLY mafia players (role === mafia), regardless of admin status
+  // Mafia kill box: ONLY players whose role is mafia
   const mafiaActionDiv = document.getElementById('m-mafia-player-action');
   if (mafiaActionDiv) {
     if (amMafia && isNightPhase) {
