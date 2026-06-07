@@ -968,8 +968,8 @@
       <div class="card" id="m-mafia-player-action" style="display:none;border-color:#e63946;background:#1a0a0a">
         <h2 style="color:#e63946">🎯 اختر ضحيتك الليلة</h2>
         <select id="m-mafia-suggestion" style="width:100%;margin-top:0.5rem"></select>
-        <button class="btn btn-red" onclick="suggestMafiaTarget()" style="margin-top:0.75rem">🎯 اقترح الهدف</button>
-        <div style="font-size:0.75rem;color:#555;margin-top:0.5rem">اقتراحك يظهر للمدير</div>
+        <button class="btn btn-red" onclick="suggestMafiaTarget()" style="margin-top:0.75rem">🎯 اختر الهدف</button>
+        <div style="font-size:0.75rem;color:#555;margin-top:0.5rem">اختيارك يُحتسب مع اختيارات المافيا فقط</div>
       </div>
 
       <!-- MY NIGHT ACTION -->
@@ -1689,10 +1689,7 @@ function launchUCFromLobby(players, settings) {
           // First launch — pick words and distribute
           const [word, spyWord] = pickUCWordsFromSettings(settings);
           const spyId = players[Math.floor(Math.random() * players.length)].id;
-          const wordReveal = {};
-          players.forEach(p => {
-            wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
-          });
+          const wordReveal = createUCWordReveal(players, spyId, word, spyWord);
           update(ref(db, `undercover/${ucState.roomCode}`), {
             phase: 'reveal', round: 1,
             players: Object.fromEntries(players.map(p => [p.id, { ...p, eliminated: false }])),
@@ -1711,16 +1708,14 @@ function launchUCFromLobby(players, settings) {
     players.forEach(p => { ucState.players[p.id] = { ...p, eliminated: false }; });
     const [word, spyWord] = pickUCWordsFromSettings(settings);
     const spyId = players[Math.floor(Math.random() * players.length)].id;
-    const wordReveal = {};
-    players.forEach(p => {
-      wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
-    });
+    const wordReveal = createUCWordReveal(players, spyId, word, spyWord);
     ucState.phase = 'reveal';
     ucState.round = 1;
     ucState.spyId = spyId;
     const myData = wordReveal[DEVICE_ID] || wordReveal[Object.keys(wordReveal)[0]];
     ucState.myWord = myData.word;
     ucState.isSpy = myData.isSpy;
+    ucState.spyHint = myData.realWordHint || buildSpyHint(word, spyWord);
     ucState.wordRevealed = true;
     ucState.events = [{ text: '🎮 بدأت اللعبة!', time: now(), isNew: true }];
     showUCWordReveal();
@@ -1735,6 +1730,35 @@ function pickUCWordsFromSettings(settings) {
   const randomCat = cats[Math.floor(Math.random() * cats.length)];
   const pairs = UC_CATEGORIES[randomCat] || UC_CATEGORIES['🍕 طعام'];
   return pairs[Math.floor(Math.random() * pairs.length)];
+}
+
+function countArabicLetters(word) {
+  return String(word || '').replace(/[\sـً-ٟؐ-ؚۖ-ۭ]/g, '').length;
+}
+
+function firstUsefulLetter(word) {
+  const letters = String(word || '').replace(/[\sـً-ٟؐ-ؚۖ-ۭ]/g, '');
+  return letters.charAt(0) || '؟';
+}
+
+function buildSpyHint(realWord, spyWord='') {
+  const first = firstUsefulLetter(realWord);
+  const count = countArabicLetters(realWord);
+  const lengthPart = count ? `وفيها ${count} حروف` : 'وعدد حروفها غير معروف';
+  let hint = `الكلمة تبدأ بحرف "${first}" ${lengthPart}`;
+  if (spyWord && spyWord !== realWord) hint += ` — الموضوع قريب من: ${spyWord}`;
+  return hint;
+}
+
+function createUCWordReveal(players, spyId, word, spyWord) {
+  const wordReveal = {};
+  players.forEach(p => {
+    const isSpy = p.id === spyId;
+    wordReveal[p.id] = isSpy
+      ? { word: '', isSpy: true, realWordHint: buildSpyHint(word, spyWord), realWordLength: countArabicLetters(word), realWordFirstLetter: firstUsefulLetter(word) }
+      : { word, isSpy: false };
+  });
+  return wordReveal;
 }
 
 // =====================================================================
@@ -1938,7 +1962,9 @@ function listenMafiaRoom() {
     mState.events = data.events ? (Array.isArray(data.events) ? data.events : Object.values(data.events)).slice(0, 5) : [];
     mState.votes = data.votes || {};
     mState.round = data.round || 1;
-    mState.mafiaSuggestions = data.mafiaSuggestions || {};
+    mState.mafiaChoices = data.mafiaChoices || data.mafiaSuggestions || {};
+    mState.doctorActions = data.doctorActions || {};
+    mState.detectiveActions = data.detectiveActions || {};
 
     // دائماً طبّق roleReveal على players لضمان صحة الأدوار
     const rawPlayers = data.players || {};
@@ -2013,35 +2039,80 @@ function showMafiaView(view) {
   if (view === 'game') document.getElementById('mafia-game').style.display = 'block';
 }
 
-function assignMafiaRoles(players, settings) {
-  const count = players.length;
+function secureRandomIndex(max) {
+  if (max <= 0) return 0;
+  if (window.crypto && window.crypto.getRandomValues) {
+    const arr = new Uint32Array(1);
+    const limit = Math.floor(0x100000000 / max) * max;
+    let x;
+    do {
+      window.crypto.getRandomValues(arr);
+      x = arr[0];
+    } while (x >= limit);
+    return x % max;
+  }
+  return Math.floor(Math.random() * max);
+}
 
-  // حساب عدد المافيا
+function shuffleArray(arr) {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = secureRandomIndex(i + 1);
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+
+function assignMafiaRoles(players, settings) {
+  const activePlayers = players.filter(p => p && p.id);
+  const count = activePlayers.length;
+  if (count < 4) throw new Error('MAFIA_MIN_PLAYERS');
+
   let mafiaCount;
   const rawCount = settings.mafiaCount;
   if (rawCount === 'auto' || rawCount === null || rawCount === undefined) {
     mafiaCount = count >= 8 ? 2 : 1;
   } else {
-    mafiaCount = parseInt(rawCount) || 1;
+    mafiaCount = parseInt(rawCount, 10) || 1;
   }
-  // دائماً على الأقل 1 مافيا، ولا يتجاوز نصف اللاعبين
-  mafiaCount = Math.max(1, Math.min(mafiaCount, Math.floor(count / 2)));
 
-  // بناء قائمة الأدوار المطلوبة
+  const specialRoles = [];
+  if (settings.detective) specialRoles.push('detective');
+  if (settings.doctor) specialRoles.push('doctor');
+
+  // عدد المافيا منطقي: لا يتجاوز نصف اللاعبين، ويترك مكاناً للأدوار الخاصة والمواطنين.
+  const maxMafia = Math.max(1, Math.min(Math.floor(count / 2), count - specialRoles.length - 1));
+  mafiaCount = Math.max(1, Math.min(mafiaCount, maxMafia));
+
   const roleList = [];
   for (let i = 0; i < mafiaCount; i++) roleList.push('mafia');
-  if (settings.detective) roleList.push('detective');
-  if (settings.doctor) roleList.push('doctor');
+  specialRoles.forEach(role => {
+    if (!roleList.includes(role) && roleList.length < count) roleList.push(role);
+  });
   while (roleList.length < count) roleList.push('citizen');
 
-  // خلط عشوائي للأدوار واللاعبين
-  const shuffledRoles = roleList.sort(() => Math.random() - 0.5);
-  const shuffledPlayers = [...players].sort(() => Math.random() - 0.5);
-
-  // توزيع الأدوار
+  const shuffledPlayers = shuffleArray(activePlayers);
+  const shuffledRoles = shuffleArray(roleList);
   const roles = {};
   shuffledPlayers.forEach((p, i) => { roles[p.id] = shuffledRoles[i]; });
+
+  // حماية أخيرة من تكرار الأدوار الخاصة.
+  ['doctor', 'detective'].forEach(role => {
+    const holders = Object.entries(roles).filter(([, r]) => r === role);
+    holders.slice(1).forEach(([pid]) => { roles[pid] = 'citizen'; });
+  });
+
   return roles;
+}
+
+function pickMajorityChoice(choicesObj) {
+  const choices = Object.values(choicesObj || {}).filter(Boolean);
+  if (!choices.length) return '';
+  const counts = {};
+  choices.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+  const topCount = Math.max(...Object.values(counts));
+  const tied = Object.entries(counts).filter(([, c]) => c === topCount).map(([id]) => id);
+  return tied[secureRandomIndex(tied.length)];
 }
 
 // Step 1: Admin distributes roles — players see their role, game not started yet
@@ -2055,15 +2126,32 @@ window.distributeRoles = async function() {
     doctor: document.getElementById('m-toggle-doctor').classList.contains('on')
   };
 
-  const roles = assignMafiaRoles(players, settings);
+  let roles;
+  try {
+    roles = assignMafiaRoles(players, settings);
+  } catch(e) {
+    return showToast('⚠️ إعدادات الأدوار غير منطقية لهذا العدد من اللاعبين');
+  }
+
+  // جولة جديدة = تنظيف كامل: لا نعتمد على أي دور أو اختيار قديم.
   const updatedPlayers = {};
-  players.forEach(p => { updatedPlayers[p.id] = { ...p, role: roles[p.id], eliminated: false }; });
+  players.forEach(p => {
+    const cleanPlayer = { ...p, eliminated: false };
+    delete cleanPlayer.role;
+    delete cleanPlayer.revealedRole;
+    updatedPlayers[p.id] = cleanPlayer;
+  });
 
   if (demoMode) {
-    mState.players = updatedPlayers;
+    mState.players = Object.fromEntries(Object.values(updatedPlayers).map(p => [p.id, { ...p, role: roles[p.id] }]));
+    mState._roleReveal = roles;
     mState.phase = 'roles_assigned';
     mState.myRole = roles[mState.playerId];
     mState.roleShown = false;
+    mState.votes = {};
+    mState.mafiaChoices = {};
+    mState.doctorActions = {};
+    mState.detectiveActions = {};
     showMafiaView('game');
     showRoleReveal(mState.myRole);
     renderMafiaPlayers();
@@ -2082,7 +2170,13 @@ window.distributeRoles = async function() {
     players: updatedPlayers,
     roleReveal: roles,
     votes: {},
-    events: [{ text: '🃏 تم توزيع الأدوار — انتظر المدير للبدء!', time: now(), isNew: true }]
+    mafiaChoices: null,
+    mafiaSuggestions: null,
+    doctorActions: null,
+    detectiveActions: null,
+    mafiaTarget: null,
+    doctorTarget: null,
+    events: [{ text: '🃏 تم توزيع الأدوار من الصفر — انتظروا بداية النهار!', time: now(), isNew: true }]
   });
 };
 
@@ -2232,11 +2326,18 @@ window.doDetectiveAction = function() {
   showToast(`🔍 ${player.name} هو: ${roleData.emoji} ${roleData.name}`, 4000);
 };
 
-window.doDoctorAction = function() {
+window.doDoctorAction = async function() {
   const sel = document.getElementById('m-doctor-sel');
   if (!sel) return;
-  mState.doctorTarget = sel.value;
+  const targetId = sel.value;
+  mState.doctorTarget = targetId;
+  mState.doctorActions = { ...(mState.doctorActions || {}), [mState.playerId]: targetId };
   showToast('💊 تم حفظ اختيارك!');
+  if (!demoMode) {
+    await update(ref(db, `mafia/${mState.roomCode}/doctorActions`), {
+      [mState.playerId]: targetId
+    });
+  }
 };
 
 window.suggestMafiaTarget = async function() {
@@ -2245,9 +2346,10 @@ window.suggestMafiaTarget = async function() {
   const targetId = sel.value;
   const target = mState.players[targetId];
   if (!target) return;
-  showToast(`🎯 اقترحت ${target.name} للمدير`);
+  mState.mafiaChoices = { ...(mState.mafiaChoices || {}), [mState.playerId]: targetId };
+  showToast(`🎯 تم اختيار ${target.name} كهدف للمافيا`);
   if (!demoMode) {
-    await update(ref(db, `mafia/${mState.roomCode}/mafiaSuggestions`), {
+    await update(ref(db, `mafia/${mState.roomCode}/mafiaChoices`), {
       [mState.playerId]: targetId
     });
   }
@@ -2269,10 +2371,17 @@ window.advanceMafiaPhase = async function(action) {
     next = 'night';
     eventText = '🌙 بدأ الليل — الأشرار يتحركون في الظلام...';
     updates.votes = {};
+    updates.mafiaChoices = null;
+    updates.mafiaSuggestions = null;
+    updates.doctorActions = null;
+    mState.mafiaChoices = {};
+    mState.doctorActions = {};
+    mState.mafiaTarget = '';
+    mState.doctorTarget = '';
   } else if (action === 'night_to_day') {
     // Process night kill
-    const target = mState.mafiaTarget;
-    const docTarget = mState.doctorTarget;
+    const target = mState.mafiaTarget || pickMajorityChoice(mState.mafiaChoices);
+    const docTarget = mState.doctorTarget || pickMajorityChoice(mState.doctorActions);
     next = 'day';
     if (target) {
       if (target !== docTarget) {
@@ -2292,6 +2401,9 @@ window.advanceMafiaPhase = async function(action) {
       eventText = `☀️ بدأ النهار — الجولة ${(mState.round||1)+1}`;
     }
     updates.round = (mState.round || 1) + 1;
+    updates.mafiaChoices = null;
+    updates.mafiaSuggestions = null;
+    updates.doctorActions = null;
   } else if (action === 'end_vote') {
     // Process votes → eliminate most voted
     const voteCounts = {};
@@ -2393,9 +2505,9 @@ window.newMafiaRound = async function() {
   const players = Object.values(mState.players).map(p => ({...p, eliminated: false, role: ''}));
   const updatedPlayers = {};
   players.forEach(p => { updatedPlayers[p.id] = p; });
-  const updates = { phase: 'waiting', players: updatedPlayers, votes: {}, events: [], round: 1, roleReveal: null };
+  const updates = { phase: 'waiting', players: updatedPlayers, votes: {}, events: [], round: 1, roleReveal: null, mafiaChoices: null, mafiaSuggestions: null, doctorActions: null, detectiveActions: null, mafiaTarget: null, doctorTarget: null };
   if (demoMode) {
-    mState.phase = 'waiting'; mState.votes = {}; mState.events = []; mState.roleShown = false;
+    mState.phase = 'waiting'; mState.votes = {}; mState.events = []; mState.roleShown = false; mState.myRole = ''; mState._roleReveal = {}; mState.mafiaChoices = {}; mState.doctorActions = {}; mState.detectiveActions = {};
     updateMafiaWaiting();
     return;
   }
@@ -2575,6 +2687,7 @@ function listenUCRoom() {
       if (!alreadySeen && myData) {
         ucState.myWord = myData.word;
         ucState.isSpy = myData.isSpy;
+        ucState.spyHint = myData.realWordHint || buildSpyHint(data.word, data.spyWord);
         showUCWordReveal();
       } else {
         showUCView('game');
@@ -2639,10 +2752,7 @@ window.startUCGame = async function() {
   const [word, spyWord] = pickUCWords();
   const spyId = players[Math.floor(Math.random() * players.length)].id;
 
-  const wordReveal = {};
-  players.forEach(p => {
-    wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
-  });
+  const wordReveal = createUCWordReveal(players, spyId, word, spyWord);
 
   const updates = {
     phase: 'reveal',
@@ -2662,6 +2772,7 @@ window.startUCGame = async function() {
     const myData = wordReveal[ucState.playerId];
     ucState.myWord = myData.word;
     ucState.isSpy = myData.isSpy;
+    ucState.spyHint = myData.realWordHint || buildSpyHint(word, spyWord);
     ucState.wordRevealed = true;
     ucState.events = updates.events;
     showUCWordReveal();
@@ -2681,20 +2792,16 @@ function showUCWordReveal() {
   if (nameEl) nameEl.textContent = ucState.playerName;
 
   if (ucState.isSpy) {
-    // Spy sees: first letter + word length hint, NOT the real word
-    const realWord = ucState.myWord; // spy's fake/hint word
-    const firstLetter = realWord.charAt(0);
-    const letterCount = realWord.length;
     if (card) card.className = 'word-card spy';
     if (wordEl) {
       wordEl.className = 'word-reveal spy-word';
       wordEl.textContent = '🕵️ أنت المتسلل!';
     }
-    if (label) label.textContent = 'تلميح عن الكلمة الحقيقية:';
-    const hintText = `الكلمة تبدأ بحرف "${firstLetter}" وتحتوي على ${letterCount} حرف`;
+    if (label) label.textContent = 'تلميح متوازن عن الكلمة الحقيقية:';
+    const hintText = ucState.spyHint || 'التلميح غير متوفر — استمع جيداً لأوصاف اللاعبين';
     if (hint) hint.innerHTML = `<div style="margin-bottom:0.5rem;color:#f85149;font-size:1rem;font-weight:700">⚠️ أنت المتسلل!</div>
       <div style="color:#e6edf3;margin-bottom:0.4rem">${hintText}</div>
-      <div style="color:#8b949e;font-size:0.8rem">استمع لأوصاف الآخرين لتخمين الكلمة الحقيقية</div>`;
+      <div style="color:#8b949e;font-size:0.8rem">التلميح قريب من الموضوع لكنه لا يكشف الكلمة مباشرة</div>`;
   } else {
     if (card) card.className = 'word-card';
     if (wordEl) {
@@ -2781,10 +2888,7 @@ window.restartUCGame = async function() {
 
   const [word, spyWord] = pickUCWords();
   const spyId = allPlayers[Math.floor(Math.random() * allPlayers.length)].id;
-  const wordReveal = {};
-  allPlayers.forEach(p => {
-    wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
-  });
+  const wordReveal = createUCWordReveal(allPlayers, spyId, word, spyWord);
 
   const updates = {
     phase: 'reveal',
@@ -2805,7 +2909,7 @@ window.restartUCGame = async function() {
     ucState.players = resetPlayers;
     ucState.events = updates.events;
     const myData = wordReveal[ucState.playerId];
-    if (myData) { ucState.myWord = myData.word; ucState.isSpy = myData.isSpy; ucState.wordRevealed = true; showUCWordReveal(); }
+    if (myData) { ucState.myWord = myData.word; ucState.isSpy = myData.isSpy; ucState.spyHint = myData.realWordHint || buildSpyHint(word, spyWord); ucState.wordRevealed = true; showUCWordReveal(); }
     return;
   }
   await update(ref(db, `undercover/${ucState.roomCode}`), updates);
@@ -2921,12 +3025,7 @@ async function startNewUCRoundAuto(eventPrefix) {
 
   const [word, spyWord] = pickUCWords();
   const spyId = alivePlayers[Math.floor(Math.random() * alivePlayers.length)].id;
-  const wordReveal = {};
-  Object.values(ucState.players).forEach(p => {
-    if (!p.eliminated) {
-      wordReveal[p.id] = { word: p.id === spyId ? spyWord : word, isSpy: p.id === spyId };
-    }
-  });
+  const wordReveal = createUCWordReveal(alivePlayers, spyId, word, spyWord);
 
   const newRound = (ucState.round || 1) + 1;
   const evts = [
@@ -2956,6 +3055,7 @@ async function startNewUCRoundAuto(eventPrefix) {
     if (myData) {
       ucState.myWord = myData.word;
       ucState.isSpy = myData.isSpy;
+      ucState.spyHint = myData.realWordHint || buildSpyHint(word, spyWord);
       ucState.wordRevealed = true;
       showUCWordReveal();
     }
