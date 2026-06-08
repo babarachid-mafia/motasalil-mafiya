@@ -689,11 +689,13 @@
       <h2 style="font-size:1rem;margin-bottom:1rem;color:#58a6ff">🔗 الانضمام لغرفة</h2>
       <div class="input-group">
         <label>اسمك</label>
-        <input id="home-join-name" placeholder="أدخل اسمك..." maxlength="15">
+        <input id="home-join-name" placeholder="أدخل اسمك..." maxlength="15"
+          onfocus="setTimeout(()=>this.scrollIntoView({behavior:'smooth',block:'center'}),300)">
       </div>
       <div class="input-group">
         <label>كود الغرفة</label>
-        <input id="home-join-code" placeholder="XXXX" maxlength="6" style="text-transform:uppercase;letter-spacing:0.2em">
+        <input id="home-join-code" placeholder="XXXX" maxlength="6" style="text-transform:uppercase;letter-spacing:0.2em"
+          onfocus="setTimeout(()=>this.scrollIntoView({behavior:'smooth',block:'center'}),300)">
       </div>
       <button class="big-btn blue" onclick="joinRoom()" style="margin-bottom:0">🚀 انضم</button>
     </div>
@@ -707,11 +709,13 @@
       <h2 style="font-size:1rem;margin-bottom:1rem;color:#ffd60a">🆕 إنشاء غرفة جديدة</h2>
       <div class="input-group">
         <label>اسمك (المدير)</label>
-        <input id="home-create-name" placeholder="أدخل اسمك..." maxlength="15">
+        <input id="home-create-name" placeholder="أدخل اسمك..." maxlength="15"
+          onfocus="setTimeout(()=>this.scrollIntoView({behavior:'smooth',block:'center'}),300)">
       </div>
       <div class="input-group">
         <label>كود الغرفة (اختياري — سيتولد تلقائياً)</label>
-        <input id="home-create-code" placeholder="اكتب كوداً أو اتركه فارغاً" maxlength="8" style="text-transform:uppercase;letter-spacing:0.15em">
+        <input id="home-create-code" placeholder="اكتب كوداً أو اتركه فارغاً" maxlength="8" style="text-transform:uppercase;letter-spacing:0.15em"
+          onfocus="setTimeout(()=>this.scrollIntoView({behavior:'smooth',block:'center'}),300)">
       </div>
       <button class="big-btn red" onclick="createRoom()" style="margin-bottom:0">🚪 إنشاء غرفة</button>
     </div>
@@ -1094,9 +1098,6 @@
       <div class="word-card" id="uc-word-card">
         <div class="word-label" id="uc-word-label">كلمتك هي:</div>
         <div class="word-reveal" id="uc-word-display">...</div>
-      </div>
-      <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:1rem;margin-top:1rem;font-size:0.85rem;color:#8b949e;text-align:center">
-        <div id="uc-role-hint">اصف الكلمة دون أن تقولها مباشرة</div>
       </div>
       <button class="big-btn blue" onclick="doneReveal()" style="margin-top:1.5rem">✅ حفظت كلمتي</button>
     </div>
@@ -1509,8 +1510,23 @@ function updateLobbyStartBtn() {
 // =====================================================================
 window.selectLobbyGame = function(game) {
   lobbyState.selectedGame = game;
-  document.getElementById('lobby-mafia-card').style.outline = game === 'mafia' ? '3px solid #e63946' : '';
-  document.getElementById('lobby-uc-card').style.outline = game === 'undercover' ? '3px solid #58a6ff' : '';
+  const mafiaCard = document.getElementById('lobby-mafia-card');
+  const ucCard = document.getElementById('lobby-uc-card');
+  if (game === 'mafia') {
+    mafiaCard.style.border = '2px solid #e63946';
+    mafiaCard.style.boxShadow = '0 0 20px rgba(230,57,70,0.4)';
+    mafiaCard.style.opacity = '1';
+    ucCard.style.border = '2px solid #111';
+    ucCard.style.boxShadow = 'none';
+    ucCard.style.opacity = '0.45';
+  } else {
+    ucCard.style.border = '2px solid #58a6ff';
+    ucCard.style.boxShadow = '0 0 20px rgba(88,166,255,0.4)';
+    ucCard.style.opacity = '1';
+    mafiaCard.style.border = '2px solid #111';
+    mafiaCard.style.boxShadow = 'none';
+    mafiaCard.style.opacity = '0.45';
+  }
   document.getElementById('lobby-mafia-settings').style.display = game === 'mafia' ? 'block' : 'none';
   document.getElementById('lobby-uc-settings').style.display = game === 'undercover' ? 'block' : 'none';
   document.getElementById('lobby-start-btn').style.display = 'block';
@@ -2563,16 +2579,24 @@ window.toggleCategory = function(cat) {
   });
 };
 
-function pickUCWords() {
-  // Use lobby settings if available
-  if (ucLobbySettings && ucLobbySettings.customWord1 && ucLobbySettings.customWord2) {
-    return [ucLobbySettings.customWord1, ucLobbySettings.customWord2];
-  }
-  const cats = (ucLobbySettings && ucLobbySettings.categories && ucLobbySettings.categories.length > 0)
-    ? ucLobbySettings.categories : Object.keys(UC_CATEGORIES);
-  const randomCat = cats[Math.floor(Math.random() * cats.length)];
-  const pairs = UC_CATEGORIES[randomCat] || UC_CATEGORIES['🍕 طعام'];
-  return pairs[Math.floor(Math.random() * pairs.length)];
+// تتبع الكلمات المستعملة في الجلسة الحالية للغرفة
+let ucUsedWords = [];
+
+function pickUCWordsUnique(settings) {
+  const src = settings || ucLobbySettings || {};
+  if (src.customWord1 && src.customWord2) return [src.customWord1, src.customWord2];
+  const cats = (src.categories && src.categories.length > 0) ? src.categories : Object.keys(UC_CATEGORIES);
+  // جمع كل الكلمات المتاحة من الفئات المختارة
+  let allPairs = [];
+  cats.forEach(cat => { if (UC_CATEGORIES[cat]) allPairs = allPairs.concat(UC_CATEGORIES[cat]); });
+  if (!allPairs.length) allPairs = [].concat(...Object.values(UC_CATEGORIES));
+  // إقصاء الكلمات المستعملة
+  const available = allPairs.filter(pair => !ucUsedWords.includes(pair[0]));
+  // إذا نفدت الكلمات، ابدأ من جديد
+  if (!available.length) { ucUsedWords = []; return allPairs[Math.floor(Math.random() * allPairs.length)]; }
+  const chosen = available[Math.floor(Math.random() * available.length)];
+  ucUsedWords.push(chosen[0]);
+  return chosen;
 }
 
 function addUCEvent(text, isNew=true) {
@@ -2761,7 +2785,7 @@ window.startUCGame = async function() {
   const players = Object.values(ucState.players || {});
   if (players.length < 3) return showToast('⚠️ تحتاج على الأقل 3 لاعبين');
 
-  const [word, spyWord] = pickUCWords();
+  const [word, spyWord] = pickUCWordsUnique();
   const spyId = players[Math.floor(Math.random() * players.length)].id;
 
   const wordReveal = createUCWordReveal(players, spyId, word, spyWord);
@@ -2798,7 +2822,6 @@ function showUCWordReveal() {
   const card = document.getElementById('uc-word-card');
   const wordEl = document.getElementById('uc-word-display');
   const label = document.getElementById('uc-word-label');
-  const hint = document.getElementById('uc-role-hint');
   const nameEl = document.getElementById('uc-reveal-name');
 
   if (nameEl) nameEl.textContent = ucState.playerName;
@@ -2809,11 +2832,7 @@ function showUCWordReveal() {
       wordEl.className = 'word-reveal spy-word';
       wordEl.textContent = '🕵️ أنت المتسلل!';
     }
-    if (label) label.textContent = 'تلميح متوازن عن الكلمة الحقيقية:';
-    const hintText = ucState.spyHint || 'التلميح غير متوفر — استمع جيداً لأوصاف اللاعبين';
-    if (hint) hint.innerHTML = `<div style="margin-bottom:0.5rem;color:#f85149;font-size:1rem;font-weight:700">⚠️ أنت المتسلل!</div>
-      <div style="color:#e6edf3;margin-bottom:0.4rem">${hintText}</div>
-      <div style="color:#8b949e;font-size:0.8rem">التلميح قريب من الموضوع لكنه لا يكشف الكلمة مباشرة</div>`;
+    if (label) label.textContent = 'دورك:';
   } else {
     if (card) card.className = 'word-card';
     if (wordEl) {
@@ -2821,7 +2840,6 @@ function showUCWordReveal() {
       wordEl.textContent = ucState.myWord;
     }
     if (label) label.textContent = 'الكلمة السرية:';
-    if (hint) hint.textContent = '💡 صف الكلمة بجملة واحدة دون ذكرها — ساعد في كشف المتسلل!';
   }
 
   showUCView('word-reveal');
@@ -2898,7 +2916,7 @@ window.restartUCGame = async function() {
   const resetPlayers = {};
   allPlayers.forEach(p => { resetPlayers[p.id] = { ...p, eliminated: false }; });
 
-  const [word, spyWord] = pickUCWords();
+  const [word, spyWord] = pickUCWordsUnique();
   const spyId = allPlayers[Math.floor(Math.random() * allPlayers.length)].id;
   const wordReveal = createUCWordReveal(allPlayers, spyId, word, spyWord);
 
@@ -3035,7 +3053,7 @@ async function startNewUCRoundAuto(eventPrefix) {
   const alivePlayers = Object.values(ucState.players).filter(p => !p.eliminated);
   if (alivePlayers.length < 2) return;
 
-  const [word, spyWord] = pickUCWords();
+  const [word, spyWord] = pickUCWordsUnique();
   const spyId = alivePlayers[Math.floor(Math.random() * alivePlayers.length)].id;
   const wordReveal = createUCWordReveal(alivePlayers, spyId, word, spyWord);
 
@@ -3190,6 +3208,7 @@ window.closeUCGameover = function() {
 window.newUCRound = async function() {
   if (!ucState.isAdmin) return;
   ucState.wordRevealed = false;
+  ucUsedWords = []; // إعادة ضبط الكلمات عند العودة للانتظار
   const updates = { phase: 'waiting', votes: {}, events: [], wordReveal: null };
   if (demoMode) { ucState.phase = 'waiting'; ucState.votes = {}; ucState.events = []; updateUCWaiting(); return; }
   await update(ref(db, `undercover/${ucState.roomCode}`), updates);
