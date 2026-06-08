@@ -1969,6 +1969,12 @@ function listenMafiaRoom() {
     // دائماً طبّق roleReveal على players لضمان صحة الأدوار
     const rawPlayers = data.players || {};
     const roleReveal = data.roleReveal || {};
+    // كشف إذا تغير roleReveal (جولة جديدة) — نعمل reset لـ roleShown
+    const roleRevealStr = JSON.stringify(roleReveal);
+    if (mState._lastRoleRevealStr && mState._lastRoleRevealStr !== roleRevealStr) {
+      mState.roleShown = false; // توزيع جديد — خصنا نبينو الدور الجديد
+    }
+    mState._lastRoleRevealStr = roleRevealStr;
     mState._roleReveal = roleReveal; // احتفظ بنسخة للاستخدام في العمليات الليلية
     mState.players = {};
     Object.values(rawPlayers).forEach(p => {
@@ -1979,11 +1985,17 @@ function listenMafiaRoom() {
     // استخرج دور هذا الجهاز من roleReveal (المصدر الوحيد الموثوق)
     const myCorrectRole = roleReveal[mState.playerId];
     if (myCorrectRole) {
-      if (!mState.myRole) mState.myRole = myCorrectRole;
+      // دائماً حدّث الدور من roleReveal — لا تعتمد على الدور القديم أبداً
+      mState.myRole = myCorrectRole;
       if (!mState.roleShown && (data.phase === 'roles_assigned' || data.phase === 'day')) {
-        mState.myRole = myCorrectRole;
         mState.roleShown = true;
         showRoleReveal(myCorrectRole);
+      }
+    } else {
+      // لا يوجد roleReveal لهذه الجولة — نظف الدور القديم
+      if (data.phase === 'waiting') {
+        mState.myRole = '';
+        mState.roleShown = false;
       }
     }
 
@@ -2147,7 +2159,7 @@ window.distributeRoles = async function() {
     mState._roleReveal = roles;
     mState.phase = 'roles_assigned';
     mState.myRole = roles[mState.playerId];
-    mState.roleShown = false;
+    mState.roleShown = false;  // دائماً reset باش تظهر بطاقة الدور الجديد
     mState.votes = {};
     mState.mafiaChoices = {};
     mState.doctorActions = {};
@@ -2507,7 +2519,7 @@ window.newMafiaRound = async function() {
   players.forEach(p => { updatedPlayers[p.id] = p; });
   const updates = { phase: 'waiting', players: updatedPlayers, votes: {}, events: [], round: 1, roleReveal: null, mafiaChoices: null, mafiaSuggestions: null, doctorActions: null, detectiveActions: null, mafiaTarget: null, doctorTarget: null };
   if (demoMode) {
-    mState.phase = 'waiting'; mState.votes = {}; mState.events = []; mState.roleShown = false; mState.myRole = ''; mState._roleReveal = {}; mState.mafiaChoices = {}; mState.doctorActions = {}; mState.detectiveActions = {};
+    mState.phase = 'waiting'; mState.votes = {}; mState.events = []; mState.roleShown = false; mState.myRole = ''; mState._roleReveal = {}; mState.mafiaChoices = {}; mState.doctorActions = {}; mState.detectiveActions = {}; mState.round = 1;
     updateMafiaWaiting();
     return;
   }
